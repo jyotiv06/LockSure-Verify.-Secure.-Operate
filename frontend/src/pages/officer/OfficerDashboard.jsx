@@ -5,14 +5,12 @@ import {
     ShieldAlert,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
 import OfficerLayout from "../../components/officer/OfficerLayout";
 import StatCard from "../../components/officer/StatCard";
 import SecurityOverview from "../../components/officer/SecurityOverview";
 import QuickActions from "../../components/officer/QuickActions";
 import RecentOperations from "../../components/officer/RecentOperations";
 function OfficerDashboard() {
-    const navigate = useNavigate();
     return (
         <OfficerLayout>
 
