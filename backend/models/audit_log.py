@@ -1,4 +1,5 @@
-from sqlalchemy import Column, BigInteger, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, String, DateTime, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.sql import func
 
 from database import Base
@@ -7,7 +8,7 @@ from database import Base
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
-    log_id = Column(
+    audit_id = Column(
         BigInteger,
         primary_key=True,
         autoincrement=True
@@ -24,17 +25,28 @@ class AuditLog(Base):
         nullable=False
     )
 
-    table_name = Column(
-        String(100)
+    entity_type = Column(
+        String(50),
+        nullable=True
     )
 
-    record_id = Column(BigInteger)
+    entity_id = Column(
+        BigInteger,
+        nullable=True
+    )
 
     ip_address = Column(
-        String(45)
+        INET,
+        nullable=True
+    )
+
+    details = Column(
+        JSON,
+        nullable=True
     )
 
     created_at = Column(
         DateTime,
-        server_default=func.now()
+        server_default=func.now(),
+        nullable=False
     )
