@@ -13,9 +13,9 @@ class LockerOperation(Base):
         autoincrement=True
     )
 
-    session_id = Column(
+    locker_id = Column(
         BigInteger,
-        ForeignKey("verification_sessions.session_id"),
+        ForeignKey("lockers.locker_id"),
         nullable=False
     )
 
@@ -25,29 +25,30 @@ class LockerOperation(Base):
         nullable=False
     )
 
-    locker_id = Column(
+    session_id = Column(
         BigInteger,
-        ForeignKey("lockers.locker_id"),
-        nullable=False
+        ForeignKey("verification_sessions.session_id"),
+        nullable=True
     )
 
-    user_id = Column(
+    officer_id = Column(
         BigInteger,
         ForeignKey("users.user_id"),
         nullable=True
     )
 
     operation_type = Column(
+        String(30),
+        nullable=False
+    )
+
+    operation_status = Column(
         String(20),
         nullable=False
     )
 
-    operation_time = Column(
+    operated_at = Column(
         DateTime,
-        server_default=func.now()
-    )
-
-    status = Column(
-        String(20),
+        server_default=func.now(),
         nullable=False
     )
