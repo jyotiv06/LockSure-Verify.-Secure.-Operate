@@ -8,9 +8,11 @@ import { customer, verificationStatus } from "../data/mockData";
 function Dashboard() {
   const navigate = useNavigate();
 
+  const username = localStorage.getItem("username") || "Customer";
+
   return (
     <div className="min-h-screen bg-gray-100">
-      
+
       <Navbar />
 
       <main className="max-w-6xl mx-auto px-6 py-8">
@@ -18,7 +20,7 @@ function Dashboard() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800">
-            Welcome back, {customer.name}
+            Welcome back, {username}
           </h2>
 
           <p className="text-gray-500 mt-2">

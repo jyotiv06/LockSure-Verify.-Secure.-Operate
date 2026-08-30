@@ -12,6 +12,7 @@ from models.risk_assessment import RiskAssessment
 from models.locker_operation import LockerOperation
 from models.security_incident import SecurityIncident
 from models.audit_log import AuditLog
+from models.user import User
 
 
 print("Creating database tables...")

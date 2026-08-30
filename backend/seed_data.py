@@ -58,15 +58,25 @@ def seed_database():
                     status = "OCCUPIED"
                     customer_id = customer_ids[(i - 31) % len(customer_ids)]
 
+                locker_size = ["SMALL", "MEDIUM", "LARGE"][i % 3]
+
+                branch_name = [
+                    "Cognizant Main Branch",
+                    "Cognizant City Branch",
+                    "Cognizant Central Branch"
+                ][(i - 1) % 3]
+
                 conn.execute(
                     text("""
                         INSERT INTO lockers
-                        (locker_number, customer_id, status)
+                        (locker_number, branch_name, locker_size, customer_id, status)
                         VALUES
-                        (:locker_number, :customer_id, :status)
+                        (:locker_number, :branch_name, :locker_size, :customer_id, :status)
                     """),
                     {
                         "locker_number": locker_number,
+                        "branch_name": branch_name,
+                        "locker_size": locker_size,
                         "customer_id": customer_id,
                         "status": status
                     }
@@ -142,14 +152,15 @@ def seed_database():
                 conn.execute(
                     text("""
                         INSERT INTO documents
-                        (customer_id, document_type, document_number)
+                        (customer_id, document_type, document_number, verified)
                         VALUES
-                        (:customer_id, :document_type, :document_number)
+                        (:customer_id, :document_type, :document_number, :verified)
                     """),
                     {
                         "customer_id": customer_id,
                         "document_type": document_type,
-                        "document_number": document_number
+                        "document_number": document_number,
+                        "verified": True
                     }
                 )
 
@@ -222,6 +233,7 @@ def seed_database():
             for index, session in enumerate(sessions):
 
                 session_id = session[0]
+                customer_id = session[1]
 
                 if index % 10 == 0:
                     match_score = round(
@@ -237,12 +249,13 @@ def seed_database():
                 conn.execute(
                     text("""
                         INSERT INTO face_verifications
-                        (session_id, match_score, result)
+                        (session_id, customer_id, match_score, result)
                         VALUES
-                        (:session_id, :match_score, :result)
+                        (:session_id, :customer_id, :match_score, :result)
                     """),
                     {
                         "session_id": session_id,
+                        "customer_id": customer_id,
                         "match_score": match_score,
                         "result": result
                     }
@@ -253,6 +266,14 @@ def seed_database():
         # --------------------------------------------------
         # 7. DOCUMENT VERIFICATIONS
         # --------------------------------------------------
+
+        documents = conn.execute(
+            text("""
+                SELECT document_id, customer_id
+                FROM documents
+                ORDER BY document_id
+            """)
+        ).fetchall()
 
         existing_doc_verification = conn.execute(
             text("SELECT COUNT(*) FROM document_verifications")
@@ -265,6 +286,20 @@ def seed_database():
             for index, session in enumerate(sessions):
 
                 session_id = session[0]
+                customer_id = session[1]
+
+                # Find a document belonging to this customer
+                customer_document = next(
+                    (
+                        doc[0]
+                        for doc in documents
+                        if doc[1] == customer_id
+                    ),
+                    None
+                )
+
+                if customer_document is None:
+                    continue
 
                 if index % 10 == 0:
                     match_score = round(
@@ -280,18 +315,26 @@ def seed_database():
                 conn.execute(
                     text("""
                         INSERT INTO document_verifications
-                        (session_id, match_score, result)
+                        (session_id, document_id, match_score, result)
                         VALUES
-                        (:session_id, :match_score, :result)
+                        (:session_id, :document_id, :match_score, :result)
                     """),
                     {
                         "session_id": session_id,
+                        "document_id": customer_document,
                         "match_score": match_score,
                         "result": result
                     }
                 )
 
             print("Document verification records created.")
+
+        else:
+            print(
+                f"Document verification records already exist: "
+                f"{existing_doc_verification}"
+            )
+
 
         # --------------------------------------------------
         # 8. RISK ASSESSMENTS
@@ -314,11 +357,13 @@ def seed_database():
                     risk_score = round(
                         random.uniform(70, 95), 2
                     )
+
                 elif index % 7 == 0:
                     risk_level = "MEDIUM"
                     risk_score = round(
                         random.uniform(40, 69), 2
                     )
+
                 else:
                     risk_level = "LOW"
                     risk_score = round(
@@ -341,6 +386,8 @@ def seed_database():
 
             print("Risk assessments created.")
 
+        else:
+            print(f"Risk assessments already exist: {existing_risk}")
         # --------------------------------------------------
         # 9. LOCKER OPERATIONS
         # --------------------------------------------------
@@ -367,23 +414,26 @@ def seed_database():
                 locker_id = locker[0]
                 customer_id = locker[1]
 
-                operation = (
-                    "ACCESS_GRANTED"
+                operation_type = "LOCKER_ACCESS"
+
+                operation_status = (
+                    "GRANTED"
                     if index % 5 != 0
-                    else "ACCESS_DENIED"
+                    else "DENIED"
                 )
 
                 conn.execute(
                     text("""
                         INSERT INTO locker_operations
-                        (locker_id, customer_id, operation)
+                        (locker_id, customer_id, operation_type, operation_status)
                         VALUES
-                        (:locker_id, :customer_id, :operation)
+                        (:locker_id, :customer_id, :operation_type, :operation_status)
                     """),
                     {
                         "locker_id": locker_id,
                         "customer_id": customer_id,
-                        "operation": operation
+                        "operation_type": operation_type,
+                        "operation_status": operation_status
                     }
                 )
 
