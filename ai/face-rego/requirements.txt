@@ -1,3 +1,7 @@
 deepface
 opencv-python
 numpy
+pandas
+Pillow
+tensorflow
+tf-keras
