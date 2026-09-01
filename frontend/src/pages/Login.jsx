@@ -3,17 +3,51 @@ import { useNavigate } from "react-router-dom";
 import Input from "../components/Input";
 import Button from "../components/Button";
 
+const API_URL = "http://127.0.0.1:8000";
+
 function Login() {
-  const [customerId, setCustomerId] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    // Dummy login for today's frontend work
-    navigate("/dashboard");
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Login failed");
+      }
+
+      // Store JWT
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("username", email);
+
+      // Go to customer dashboard
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,10 +72,11 @@ function Login() {
         <form onSubmit={handleLogin}>
 
           <Input
-            label="Customer ID"
-            placeholder="Enter your Customer ID"
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
+            label="Email"
+            placeholder="Enter your Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
           />
 
           <Input
@@ -52,20 +87,25 @@ function Login() {
             onChange={(e) => setPassword(e.target.value)}
           />
 
+          {error && (
+            <div className="mt-4 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
           <div className="mt-6">
             <Button type="submit">
-              Login
+              {loading ? "Logging in..." : "Login"}
             </Button>
           </div>
 
         </form>
 
         <p className="text-center text-sm text-gray-400 mt-6">
-          Demo login • Secure locker operation system
+          Secure locker operation system
         </p>
 
       </div>
-
     </div>
   );
 }

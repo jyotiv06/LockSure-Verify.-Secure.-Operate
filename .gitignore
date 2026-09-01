@@ -1,5 +1,21 @@
+#.env
 .env
-__pycache__
-node_modules
-venv
-.venv
+#__pycache__
+#node_modules
+#venv
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Test/data images
+ai/face-rego/data/live/*.jpg
+ai/face-rego/data/live/*.jpeg
+ai/face-rego/data/live/*.png
+
+# IDE
+.vscode/
