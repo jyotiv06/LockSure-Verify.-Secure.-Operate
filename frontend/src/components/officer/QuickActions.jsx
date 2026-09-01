@@ -5,6 +5,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+import { useNavigate } from "react-router-dom";
+
 const actions = [
   {
     title: "Verify Customer",
@@ -24,12 +26,14 @@ const actions = [
     title: "Review High Risk",
     description: "Investigate suspicious activity",
     icon: ShieldAlert,
-    path: "/officer/alerts",
+    path: "/officer/security-alerts",
     variant: "red",
   },
 ];
 
 function QuickActions() {
+  const navigate = useNavigate();
+
   return (
     <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
 
@@ -49,10 +53,11 @@ function QuickActions() {
           const Icon = action.icon;
 
           return (
-            <a
+            <button
               key={action.title}
-              href={action.path}
-              className="group flex items-center gap-3 rounded-xl border border-[#E2E8F0] p-3.5 transition-all duration-200 hover:border-[#BFDBFE] hover:bg-[#F8FAFF]"
+              type="button"
+              onClick={() => navigate(action.path)}
+              className="group flex w-full items-center gap-3 rounded-xl border border-[#E2E8F0] p-3.5 text-left transition-all duration-200 hover:border-[#BFDBFE] hover:bg-[#F8FAFF]"
             >
 
               <div
@@ -86,7 +91,7 @@ function QuickActions() {
                 className="text-[#94A3B8] transition-transform group-hover:translate-x-1 group-hover:text-[#2563EB]"
               />
 
-            </a>
+            </button>
           );
         })}
 

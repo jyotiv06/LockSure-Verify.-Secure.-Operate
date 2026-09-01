@@ -98,7 +98,7 @@ function App() {
         />
 
         <Route
-          path="/officer/verification"
+          path="/officer/customer-verification"
           element={<CustomerVerification />}
         />
 
@@ -108,7 +108,7 @@ function App() {
         />
 
         <Route
-          path="/officer/alerts"
+          path="/officer/security-alerts"
           element={<SecurityAlerts />}
         />
 
@@ -116,10 +116,7 @@ function App() {
           path="/officer/history"
           element={<AuditHistory />}
         />
-        <Route
-          path="/officer/login"
-          element={<OfficerLogin />}
-/>
+  
 
         {/* Unknown route */}
         <Route

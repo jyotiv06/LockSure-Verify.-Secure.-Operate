@@ -16,18 +16,28 @@ function OfficerLogin() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
-    e.preventDefault();
+const handleLogin = (e) => {
+  e.preventDefault();
 
+  setLoading(true);
+  setError("");
+
+  setTimeout(() => {
     if (!officerId.trim() || !password.trim()) {
       setError("Please enter Officer ID and password.");
+      setLoading(false);
       return;
     }
 
-    // Dummy login for today's UI work.
+    localStorage.setItem("officerToken", "demo-officer-token");
+
     navigate("/officer/dashboard");
-  };
+
+    setLoading(false);
+  }, 500);
+};
 
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
@@ -80,11 +90,9 @@ function OfficerLogin() {
           </div>
 
           <div className="space-y-3">
-
             <SecurityPoint text="Identity verification" />
             <SecurityPoint text="Document authenticity" />
             <SecurityPoint text="Locker authorization" />
-
           </div>
 
         </div>
@@ -94,6 +102,7 @@ function OfficerLogin() {
 
           <div className="w-full max-w-md">
 
+            {/* Mobile Logo */}
             <div className="mb-8 lg:hidden">
 
               <div className="flex items-center gap-3">
@@ -118,6 +127,7 @@ function OfficerLogin() {
 
             <div className="rounded-2xl border border-[#E2E8F0] bg-white p-7 shadow-sm sm:p-9">
 
+              {/* Heading */}
               <div className="mb-7">
 
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
@@ -141,22 +151,34 @@ function OfficerLogin() {
 
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-5">
+              {/* Form */}
+              <form
+                onSubmit={handleLogin}
+                className="space-y-5"
+              >
 
+                {/* Officer ID */}
                 <div>
+
                   <label className="mb-2 block text-xs font-semibold text-[#334155]">
                     Officer ID
                   </label>
 
                   <input
                     value={officerId}
-                    onChange={(e) => setOfficerId(e.target.value)}
+                    onChange={(e) =>
+                      setOfficerId(e.target.value)
+                    }
                     placeholder="Enter Officer ID"
+                    required
                     className="w-full rounded-xl border border-[#CBD5E1] px-4 py-3 text-sm outline-none transition focus:border-[#2563EB] focus:ring-4 focus:ring-blue-50"
                   />
+
                 </div>
 
+                {/* Password */}
                 <div>
+
                   <label className="mb-2 block text-xs font-semibold text-[#334155]">
                     Password
                   </label>
@@ -164,10 +186,17 @@ function OfficerLogin() {
                   <div className="relative">
 
                     <input
-                      type={showPassword ? "text" : "password"}
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) =>
+                        setPassword(e.target.value)
+                      }
                       placeholder="Enter password"
+                      required
                       className="w-full rounded-xl border border-[#CBD5E1] px-4 py-3 pr-11 text-sm outline-none transition focus:border-[#2563EB] focus:ring-4 focus:ring-blue-50"
                     />
 
@@ -186,26 +215,36 @@ function OfficerLogin() {
                     </button>
 
                   </div>
+
                 </div>
 
+                {/* Error */}
                 {error && (
                   <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                     {error}
                   </div>
                 )}
 
+                {/* Submit */}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-[#2563EB] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] hover:shadow-md"
+                  disabled={loading}
+                  className="w-full rounded-xl bg-[#2563EB] px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Sign In to Officer Portal
+                  {loading
+                    ? "Signing In..."
+                    : "Sign In to Officer Portal"}
                 </button>
 
               </form>
 
+              {/* Footer */}
               <div className="mt-6 flex items-center justify-center gap-2 border-t border-[#E2E8F0] pt-5 text-xs text-[#64748B]">
+
                 <LockKeyhole size={14} />
+
                 Secure officer authentication
+
               </div>
 
             </div>
@@ -223,11 +262,14 @@ function OfficerLogin() {
 function SecurityPoint({ text }) {
   return (
     <div className="flex items-center gap-3 text-sm text-slate-300">
+
       <CheckCircle2
         size={17}
         className="text-[#10B981]"
       />
+
       {text}
+
     </div>
   );
 }

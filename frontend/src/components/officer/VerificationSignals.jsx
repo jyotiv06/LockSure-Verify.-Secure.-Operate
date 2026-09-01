@@ -4,32 +4,140 @@ import {
   CreditCard,
   History,
   CheckCircle2,
+  Clock3,
+  XCircle,
 } from "lucide-react";
 
-const signals = [
-  {
-    label: "Document",
-    value: "Verified",
-    icon: FileCheck2,
-  },
-  {
-    label: "Face",
-    value: "98.4% Match",
-    icon: ScanFace,
-  },
-  {
-    label: "Account",
-    value: "Active",
-    icon: CreditCard,
-  },
-  {
-    label: "History",
-    value: "Normal",
-    icon: History,
-  },
-];
+function VerificationSignals({ verificationData }) {
+  /*
+    Backend verification states may vary depending
+    on the current verification stage.
+  */
 
-function VerificationSignals() {
+  /*
+    Account/customer matching is currently based on
+    whether a valid verification session exists.
+
+    You can replace this later when the backend provides
+    a dedicated account_match field.
+  */
+  const accountVerified =
+    verificationData?.account_match === true;
+
+  /*
+    History may not yet exist in the backend response.
+    Keep it as Pending until the backend provides it.
+  */
+  const historyStatus =
+    verificationData?.history_status ||
+    "Pending";
+
+
+  const getStatus = (value, verifiedText = "Verified") => {
+
+    if (value === true) {
+      return {
+        label: verifiedText,
+        type: "verified",
+      };
+    }
+
+    if (value === false) {
+      return {
+        label: "Failed",
+        type: "failed",
+      };
+    }
+
+    return {
+      label: "Pending",
+      type: "pending",
+    };
+  };
+
+
+  const signals = [
+    {
+      label: "Document",
+      icon: FileCheck2,
+      status: getStatus(
+        verificationData?.document_match
+      ),
+    },
+
+    {
+      label: "Face Match",
+      icon: ScanFace,
+      status: getStatus(
+        verificationData?.face_match
+      ),
+    },
+
+    {
+      label: "Account Match",
+      icon: CreditCard,
+      status: getStatus(
+        verificationData?.account_match
+      ),
+    },
+
+    {
+      label: "History",
+      icon: History,
+      status: {
+        label: historyStatus,
+        type:
+          historyStatus === "Normal"
+            ? "verified"
+            : "pending",
+      },
+    },
+  ];
+
+
+  const getStatusIcon = (type) => {
+
+    if (type === "verified") {
+      return (
+        <CheckCircle2
+          size={18}
+          className="text-[#10B981]"
+        />
+      );
+    }
+
+    if (type === "failed") {
+      return (
+        <XCircle
+          size={18}
+          className="text-red-500"
+        />
+      );
+    }
+
+    return (
+      <Clock3
+        size={18}
+        className="text-[#F59E0B]"
+      />
+    );
+  };
+
+
+  const getStatusColor = (type) => {
+
+    if (type === "verified") {
+      return "text-[#059669]";
+    }
+
+    if (type === "failed") {
+      return "text-red-600";
+    }
+
+    return "text-[#D97706]";
+  };
+
+
   return (
     <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
 
@@ -45,12 +153,15 @@ function VerificationSignals() {
 
       </div>
 
+
       <div className="grid gap-3 sm:grid-cols-2">
 
         {signals.map((signal) => {
+
           const Icon = signal.icon;
 
           return (
+
             <div
               key={signal.label}
               className="flex items-center justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4"
@@ -59,11 +170,14 @@ function VerificationSignals() {
               <div className="flex items-center gap-3">
 
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white">
+
                   <Icon
                     size={17}
                     className="text-[#2563EB]"
                   />
+
                 </div>
+
 
                 <div>
 
@@ -71,21 +185,28 @@ function VerificationSignals() {
                     {signal.label}
                   </p>
 
-                  <p className="mt-1 text-sm font-semibold text-[#111827]">
-                    {signal.value}
+
+                  <p
+                    className={`mt-1 text-sm font-semibold ${getStatusColor(
+                      signal.status.type
+                    )}`}
+                  >
+                    {signal.status.label}
                   </p>
 
                 </div>
 
               </div>
 
-              <CheckCircle2
-                size={18}
-                className="text-[#10B981]"
-              />
+
+              {getStatusIcon(
+                signal.status.type
+              )}
 
             </div>
+
           );
+
         })}
 
       </div>
@@ -93,5 +214,6 @@ function VerificationSignals() {
     </div>
   );
 }
+
 
 export default VerificationSignals;
