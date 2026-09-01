@@ -23,7 +23,6 @@ function VerificationSignals({ verificationData }) {
   */
   const accountVerified =
     verificationData?.account_match === true;
-
   /*
     History may not yet exist in the backend response.
     Keep it as Pending until the backend provides it.
