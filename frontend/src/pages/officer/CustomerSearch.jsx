@@ -205,7 +205,7 @@ function CustomerSearch() {
               type="button"
               onClick={() =>
                 navigate(
-                  `/officer/verification?customer=${customer.id}`
+                  `/officer/customer-verification?customer=${customer.id}`
                 )
               }
               className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8]"

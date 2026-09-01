@@ -1,182 +1,221 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Card from "../components/Card";
-import Button from "../components/Button";
-import StatusBadge from "../components/StatusBadge";
+import { Upload, CheckCircle2, AlertCircle } from "lucide-react";
 
-function DocumentVerification() {
-  const navigate = useNavigate();
+import api from "../services/api";
 
+function DocumentVerification({
+  verificationData,
+  verificationId,
+}) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [verificationResult, setVerificationResult] =
+    useState(null);
 
   const handleFileChange = (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
 
-    if (file) {
-      setSelectedFile(file);
+    if (!file) return;
+
+    setSelectedFile(file);
+    setError("");
+    setVerificationResult(null);
+  };
+
+  const handleVerifyDocument = async () => {
+    if (!selectedFile) {
+      setError("Please select a document first.");
+      return;
+    }
+
+    // Prefer prop, fallback to localStorage
+    const activeVerificationId =
+      verificationId ||
+      localStorage.getItem("verificationId");
+
+    if (!activeVerificationId) {
+      setError(
+        "Verification session not found. Please start verification again."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      /*
+        Current backend API expects JSON.
+
+        The selected file is currently only used
+        as a UI selection because the backend
+        endpoint does not yet support multipart
+        file uploads.
+      */
+
+      const response = await api.post(
+        `/verification/${activeVerificationId}/document`,
+        {
+          document_match: true,
+        }
+      );
+
+      console.log(
+        "Document verification result:",
+        response.data
+      );
+
+      setVerificationResult(response.data);
+
+    } catch (error) {
+      console.error(
+        "Document verification error:",
+        error
+      );
+
+      setError(
+        error.response?.data?.detail ||
+          "Document verification failed."
+      );
+
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleContinue = () => {
-    navigate("/face-verification");
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
 
-      <Navbar />
+      {/* Header */}
+      <div className="mb-5">
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#2563EB]">
+          Step 2
+        </p>
 
-        {/* Heading */}
-        <div className="mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">
-            Document Verification
-          </h2>
+        <h3 className="mt-1 text-lg font-bold text-[#111827]">
+          Document Verification
+        </h3>
 
-          <p className="text-gray-500 mt-2">
-            Upload a valid identity document for verification.
+        <p className="mt-1 text-sm text-[#64748B]">
+          Upload and verify the customer's identity document.
+        </p>
+
+      </div>
+
+
+      {/* Error */}
+      {error && (
+        <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+
+          <AlertCircle size={18} />
+
+          {error}
+
+        </div>
+      )}
+
+
+      {/* Success */}
+      {verificationResult && (
+        <div className="mb-5 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+
+          <CheckCircle2 size={18} />
+
+          Document verification completed successfully.
+
+        </div>
+      )}
+
+
+      {/* Upload Area */}
+      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#CBD5E1] p-8 transition hover:border-[#2563EB] hover:bg-blue-50">
+
+        <Upload
+          size={32}
+          className="mb-3 text-[#2563EB]"
+        />
+
+        <p className="font-semibold text-[#334155]">
+          Choose identity document
+        </p>
+
+        <p className="mt-1 text-xs text-[#64748B]">
+          Aadhaar, PAN, Passport or Driving Licence
+        </p>
+
+        <p className="mt-1 text-xs text-[#94A3B8]">
+          JPG, JPEG, PNG or PDF
+        </p>
+
+        <input
+          type="file"
+          className="hidden"
+          accept=".jpg,.jpeg,.png,.pdf"
+          onChange={handleFileChange}
+        />
+
+      </label>
+
+
+      {/* Selected File */}
+      {selectedFile && (
+        <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+
+          <p className="text-sm font-semibold text-[#334155]">
+            Selected Document
           </p>
-        </div>
 
-        {/* Verification Steps */}
-        <div className="flex items-center gap-3 mb-6">
-          <StatusBadge status="Verified" />
+          <p className="mt-1 text-sm text-[#64748B]">
+            {selectedFile.name}
+          </p>
 
-          <span className="text-gray-400">→</span>
-
-          <StatusBadge status="Pending" />
-
-          <span className="text-gray-500 text-sm">
-            Document Verification
-          </span>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6">
-
-          {/* Document Upload */}
-          <Card>
-
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">
-              Upload Document
-            </h3>
-
-            <p className="text-gray-500 text-sm mb-5">
-              Accepted documents: Aadhaar Card, PAN Card, Passport or Driving
-              Licence.
-            </p>
-
-            <label className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition">
-
-              <div className="text-4xl mb-3">
-                📄
-              </div>
-
-              <p className="font-medium text-gray-700">
-                Choose a document
-              </p>
-
-              <p className="text-sm text-gray-400 mt-1">
-                Click here to upload
-              </p>
-
-              <input
-                type="file"
-                className="hidden"
-                accept=".jpg,.jpeg,.png,.pdf"
-                onChange={handleFileChange}
-              />
-
-            </label>
-
-            {/* Selected File */}
-            {selectedFile && (
-              <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
-
-                <p className="text-sm text-green-700">
-                  ✓ Document selected
-                </p>
-
-                <p className="text-sm text-gray-600 mt-1">
-                  {selectedFile.name}
-                </p>
-
-              </div>
-            )}
-
-          </Card>
-
-          {/* Camera Section */}
-          <Card>
-
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">
-              Capture Document
-            </h3>
-
-            <p className="text-gray-500 text-sm mb-5">
-              You can also capture your document using the camera.
-            </p>
-
-            {/* Dummy Camera */}
-            <div className="h-52 bg-gray-900 rounded-xl flex flex-col items-center justify-center text-white">
-
-              {cameraOpen ? (
-                <>
-                  <div className="text-4xl mb-3">
-                    📷
-                  </div>
-
-                  <p>
-                    Camera Preview
-                  </p>
-
-                  <p className="text-sm text-gray-400 mt-1">
-                    Camera integration will be added later.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="text-4xl mb-3">
-                    📷
-                  </div>
-
-                  <p>
-                    Camera is currently closed
-                  </p>
-                </>
-              )}
-
-            </div>
-
-            <div className="mt-4">
-
-              <Button
-                variant="secondary"
-                onClick={() => setCameraOpen(!cameraOpen)}
-              >
-                {cameraOpen ? "Close Camera" : "Open Camera"}
-              </Button>
-
-            </div>
-
-          </Card>
+          <p className="mt-1 text-xs text-[#94A3B8]">
+            {(selectedFile.size / 1024).toFixed(2)} KB
+          </p>
 
         </div>
+      )}
 
-        {/* Continue */}
-        <div className="mt-6 flex justify-end">
 
-          <Button
-            onClick={handleContinue}
-          >
-            Continue to Face Verification
-          </Button>
+      {/* Backend Status */}
+      {verificationData && (
+        <div className="mt-4 rounded-lg bg-[#F8FAFC] p-3 text-xs text-[#64748B]">
+
+          Verification session active
+
+          {verificationId && (
+            <span className="ml-2 font-mono text-[#334155]">
+              #{verificationId.slice(0, 8)}
+            </span>
+          )}
 
         </div>
+      )}
 
-      </main>
+
+      {/* Verify Button */}
+      <div className="mt-5 flex justify-end">
+
+        <button
+          type="button"
+          onClick={handleVerifyDocument}
+          disabled={
+            loading ||
+            !selectedFile ||
+            verificationResult
+          }
+          className="inline-flex items-center justify-center rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading
+            ? "Verifying..."
+            : verificationResult
+              ? "Document Verified"
+              : "Verify Document"}
+        </button>
+
+      </div>
 
     </div>
   );

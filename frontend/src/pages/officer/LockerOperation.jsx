@@ -1,307 +1,278 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Lock,
+  Unlock,
+  User,
+  Building2,
+  MapPin,
+  ShieldCheck,
+  Power,
+} from "lucide-react";
+
 import OfficerLayout from "../../components/officer/OfficerLayout";
 
-function LockerOperation() {
-  const [isOpen, setIsOpen] = useState(false);
+function LockerOperations() {
+  const navigate = useNavigate();
 
-  const verificationComplete = true;
-  const authorizationApproved = true;
+  const [lockerOpen, setLockerOpen] = useState(false);
+  const [operationMessage, setOperationMessage] = useState("");
 
-  const canOperate =
-    verificationComplete && authorizationApproved;
+  const handleOpenLocker = () => {
+    setLockerOpen(true);
+    setOperationMessage("Locker opened successfully.");
+  };
 
-  const handleLocker = () => {
-    if (!canOperate) return;
-
-    setIsOpen((previous) => !previous);
+  const handleCloseLocker = () => {
+    setLockerOpen(false);
+    setOperationMessage("Locker closed successfully.");
   };
 
   return (
     <OfficerLayout>
+      {/* Back Button */}
+      <button
+        type="button"
+        onClick={() => navigate("/officer/dashboard")}
+        className="mb-5 flex items-center gap-2 text-xs font-semibold text-[#64748B] transition hover:text-[#2563EB]"
+      >
+        <ArrowLeft size={16} />
 
-      {/* PAGE HEADER */}
+        Back to Dashboard
+      </button>
+
+      {/* Header */}
       <div className="mb-6">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#2563EB]">
           Locker Control
         </p>
 
         <h1 className="text-2xl font-bold text-[#111827] sm:text-3xl">
-          Locker Operation
+          Locker Operations
         </h1>
 
         <p className="mt-2 text-sm text-[#64748B]">
-          Control authorized locker access after successful verification.
+          Monitor and control the customer's assigned locker.
         </p>
       </div>
 
+      {/* Success Message */}
+      {operationMessage && (
+        <div className="mb-6 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+          <ShieldCheck size={18} />
 
-      {/* MAIN GRID */}
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-
-
-        {/* LEFT - LOCKER */}
-        <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-
-          {/* Locker Header */}
-          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-5">
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#64748B]">
-                Locker
-              </p>
-
-              <h2 className="mt-1 font-mono text-xl font-bold text-[#111827]">
-                L-102
-              </h2>
-            </div>
-
-            <span
-              className={`rounded-full px-3 py-2 text-xs font-bold ${
-                isOpen
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {isOpen ? "OPEN" : "LOCKED"}
-            </span>
-
-          </div>
-
-
-          {/* Locker Visual */}
-          <div className="flex min-h-[350px] items-center justify-center">
-
-            <div
-              className={`relative flex h-60 w-48 items-center justify-center rounded-2xl border-4 transition-all duration-500 ${
-                isOpen
-                  ? "border-amber-300 bg-amber-50"
-                  : "border-[#1E293B] bg-[#0B1220]"
-              }`}
-            >
-
-              {/* Locker light */}
-              <div className="absolute left-4 top-4 h-2.5 w-2.5 rounded-full bg-[#10B981]" />
-
-              <div className="text-center">
-
-                <div className="text-5xl">
-                  {isOpen ? "🔓" : "🔒"}
-                </div>
-
-                <p
-                  className={`mt-5 text-sm font-bold uppercase tracking-[0.2em] ${
-                    isOpen
-                      ? "text-amber-700"
-                      : "text-white"
-                  }`}
-                >
-                  {isOpen ? "OPEN" : "LOCKED"}
-                </p>
-
-                <p
-                  className={`mt-2 font-mono text-xs ${
-                    isOpen
-                      ? "text-amber-600"
-                      : "text-slate-400"
-                  }`}
-                >
-                  L-102
-                </p>
-
-              </div>
-
-            </div>
-
-          </div>
-
-
-          {/* Locker Button */}
-          <div className="border-t border-[#E2E8F0] pt-5">
-
-            <button
-              type="button"
-              disabled={!canOperate}
-              onClick={handleLocker}
-              className={`w-full rounded-xl px-5 py-3.5 text-sm font-bold transition ${
-                !canOperate
-                  ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                  : isOpen
-                  ? "bg-[#F59E0B] text-white hover:bg-[#D97706]"
-                  : "bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
-              }`}
-            >
-              {isOpen ? "CLOSE LOCKER" : "OPEN LOCKER"}
-            </button>
-
-          </div>
-
+          {operationMessage}
         </div>
+      )}
 
+      {/* Main Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Locker Status */}
+        <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm lg:col-span-2">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            {/* Locker Icon */}
+            <div
+              className={`flex h-28 w-28 items-center justify-center rounded-3xl ${
+                lockerOpen
+                  ? "bg-green-50"
+                  : "bg-red-50"
+              }`}
+            >
+              {lockerOpen ? (
+                <Unlock
+                  size={52}
+                  className="text-green-600"
+                />
+              ) : (
+                <Lock
+                  size={52}
+                  className="text-red-500"
+                />
+              )}
+            </div>
 
-        {/* RIGHT - AUTHORIZATION */}
-        <div className="space-y-6">
-
-
-          {/* Authorization Card */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-
-            <h2 className="text-base font-bold text-[#111827]">
-              Operation Authorization
-            </h2>
-
-            <p className="mt-1 text-sm text-[#64748B]">
-              Required checks before locker access.
+            {/* Status */}
+            <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+              Current Locker Status
             </p>
 
-
-            <div className="mt-6 space-y-3">
-
-              <CheckRow
-                label="Verification"
-                value="Complete"
-              />
-
-              <CheckRow
-                label="Authorization"
-                value="Approved"
-              />
-
-              <CheckRow
-                label="Locker Controller"
-                value="Online"
-              />
-
-            </div>
-
-          </div>
-
-
-          {/* Customer Card */}
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-
-            <h2 className="text-base font-bold text-[#111827]">
-              Customer
+            <h2
+              className={`mt-2 text-3xl font-bold ${
+                lockerOpen
+                  ? "text-green-600"
+                  : "text-red-500"
+              }`}
+            >
+              {lockerOpen ? "OPEN" : "LOCKED"}
             </h2>
 
-            <div className="mt-5 space-y-4">
+            <p className="mt-3 max-w-md text-sm text-[#64748B]">
+              {lockerOpen
+                ? "The locker is currently open and ready for customer access."
+                : "The locker is securely locked and no access is currently active."}
+            </p>
 
-              <InfoRow
-                label="Customer"
-                value="Rahul Sharma"
-              />
+            {/* Controls */}
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              {!lockerOpen ? (
+                <button
+                  type="button"
+                  onClick={handleOpenLocker}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8]"
+                >
+                  <Unlock size={17} />
 
-              <InfoRow
-                label="Customer ID"
-                value="CUST102"
-              />
+                  Open Locker
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCloseLocker}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-red-600"
+                >
+                  <Lock size={17} />
 
-              <InfoRow
-                label="Locker"
-                value="L-102"
-              />
+                  Close Locker
+                </button>
+              )}
 
-              <InfoRow
-                label="Operation"
-                value="Open Locker"
-              />
+              <button
+                type="button"
+                onClick={() => navigate("/officer/dashboard")}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E2E8F0] px-6 py-3 text-sm font-semibold text-[#475569] transition hover:bg-[#F8FAFC]"
+              >
+                <Power size={17} />
 
+                End Operation
+              </button>
             </div>
-
           </div>
+        </div>
 
+        {/* Locker Information */}
+        <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+          <h3 className="text-base font-bold text-[#111827]">
+            Locker Information
+          </h3>
 
-          {/* Security Notice */}
-          <div className="rounded-2xl border border-[#BAE6FD] bg-[#F0F9FF] p-5">
+          <p className="mt-1 text-sm text-[#64748B]">
+            Active operation details.
+          </p>
 
-            <div className="flex gap-3">
-
-              <div className="text-lg">
-                🛡️
+          <div className="mt-6 space-y-5">
+            {/* Customer */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF]">
+                <User
+                  size={17}
+                  className="text-[#2563EB]"
+                />
               </div>
 
               <div>
-
-                <p className="text-sm font-bold text-[#0C4A6E]">
-                  Controlled Access
+                <p className="text-xs text-[#94A3B8]">
+                  Customer
                 </p>
 
-                <p className="mt-1 text-xs leading-5 text-[#0369A1]">
-                  Locker access is permitted only after customer
-                  verification and officer authorization are complete.
+                <p className="mt-1 text-sm font-semibold text-[#111827]">
+                  Rahul Sharma
                 </p>
+              </div>
+            </div>
 
+            {/* Locker */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF]">
+                <Lock
+                  size={17}
+                  className="text-[#2563EB]"
+                />
               </div>
 
+              <div>
+                <p className="text-xs text-[#94A3B8]">
+                  Locker Number
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-[#111827]">
+                  LKR-204
+                </p>
+              </div>
             </div>
 
+            {/* Branch */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF]">
+                <Building2
+                  size={17}
+                  className="text-[#2563EB]"
+                />
+              </div>
+
+              <div>
+                <p className="text-xs text-[#94A3B8]">
+                  Branch
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-[#111827]">
+                  Pune Central
+                </p>
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF]">
+                <MapPin
+                  size={17}
+                  className="text-[#2563EB]"
+                />
+              </div>
+
+              <div>
+                <p className="text-xs text-[#94A3B8]">
+                  Locker Location
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-[#111827]">
+                  Section B · Row 04
+                </p>
+              </div>
+            </div>
           </div>
 
+          {/* Security */}
+          <div className="mt-6 rounded-xl border border-green-100 bg-green-50 p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck
+                size={17}
+                className="text-green-600"
+              />
 
-          {/* Open Warning */}
-          {isOpen && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-
-              <p className="text-sm font-bold text-amber-800">
-                Locker Currently Open
-              </p>
-
-              <p className="mt-1 text-xs leading-5 text-amber-700">
-                Complete the customer operation and close the locker
-                before leaving this screen.
-              </p>
-
+              <span className="text-sm font-semibold text-green-700">
+                Verification Approved
+              </span>
             </div>
-          )}
 
+            <p className="mt-2 text-xs leading-5 text-green-700">
+              Customer verification has been approved. Locker access is
+              authorized for this operation.
+            </p>
+          </div>
         </div>
-
       </div>
 
+      {/* Operation Note */}
+      <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-white px-5 py-4">
+        <p className="text-xs leading-5 text-[#64748B]">
+          Demo mode: Locker open and close actions are currently simulated
+          in the frontend. Physical locker hardware integration will be
+          connected separately.
+        </p>
+      </div>
     </OfficerLayout>
   );
 }
 
-
-/* ========================= */
-/* CHECK ROW                  */
-/* ========================= */
-
-function CheckRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl bg-[#F8FAFC] p-3">
-
-      <span className="text-sm font-medium text-[#334155]">
-        {label}
-      </span>
-
-      <span className="flex items-center gap-1.5 text-xs font-bold text-[#10B981]">
-        ✓ {value}
-      </span>
-
-    </div>
-  );
-}
-
-
-/* ========================= */
-/* INFO ROW                   */
-/* ========================= */
-
-function InfoRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between border-b border-[#F1F5F9] pb-3 last:border-0 last:pb-0">
-
-      <span className="text-xs text-[#94A3B8]">
-        {label}
-      </span>
-
-      <span className="text-xs font-semibold text-[#334155]">
-        {value}
-      </span>
-
-    </div>
-  );
-}
-
-
-export default LockerOperation;
+export default LockerOperations;
