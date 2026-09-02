@@ -10,14 +10,20 @@ function FaceVerification() {
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const cameraStartedRef = useRef(false);
 
   const [cameraActive, setCameraActive] = useState(false);
   const [captured, setCaptured] = useState(false);
   const [status, setStatus] = useState("idle");
+  const [faceScore, setFaceScore] = useState(null);
   const [cameraError, setCameraError] = useState("");
   const [error, setError] = useState("");
 
   const startCamera = async () => {
+    if (cameraStartedRef.current && streamRef.current) {
+      return;
+    }
+
     setCameraError("");
 
     try {
@@ -30,6 +36,7 @@ function FaceVerification() {
         });
 
       streamRef.current = stream;
+      cameraStartedRef.current = true;
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -55,6 +62,7 @@ function FaceVerification() {
       streamRef.current = null;
     }
 
+    cameraStartedRef.current = false;
     setCameraActive(false);
   };
 
@@ -66,65 +74,149 @@ function FaceVerification() {
         streamRef.current
           .getTracks()
           .forEach((track) => track.stop());
+
+        streamRef.current = null;
       }
+
+      cameraStartedRef.current = false;
     };
   }, []);
 
   const handleCapture = async () => {
-    if (!cameraActive) return;
+    if (!cameraActive || !videoRef.current) {
+      return;
+    }
 
     const verificationId =
       localStorage.getItem("verification_id");
+
+    const token = localStorage.getItem("token");
 
     if (!verificationId) {
       setError("Verification session not found.");
       return;
     }
 
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
     setCaptured(true);
     setStatus("processing");
     setError("");
+    setFaceScore(null);
+
+    const video = videoRef.current;
+
+    /*
+     * Capture the actual camera frame.
+     * The image is sent to the backend as multipart/form-data.
+     * We never send face_match=true from the browser.
+     */
+    const canvas = document.createElement("canvas");
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      setStatus("idle");
+      setCaptured(false);
+      setError("Unable to capture the camera image.");
+      return;
+    }
+
+    context.drawImage(
+      video,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
 
     stopCamera();
 
     try {
-      /*
-       * Demo/OA integration mode:
-       * The captured face is treated as matched and the
-       * result is persisted through the backend.
-       *
-       * Real CV can later replace face_match=true with
-       * reference_image + live_image.
-       */
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (value) => {
+            if (value) {
+              resolve(value);
+            } else {
+              reject(
+                new Error(
+                  "Unable to create image from camera."
+                )
+              );
+            }
+          },
+          "image/jpeg",
+          0.92
+        );
+      });
+
+      const formData = new FormData();
+      formData.append(
+        "file",
+        blob,
+        `live_face_${Date.now()}.jpg`
+      );
 
       const response = await fetch(
-        `${API_BASE}/verification/${verificationId}/face`,
+        `${API_BASE}/verification/${verificationId}/face/upload`,
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            face_match: true,
-          }),
+          body: formData,
         }
       );
 
+      const data = await response.json().catch(() => ({}));
+
+      console.log("FACE VERIFICATION STATUS:", response.status);
+      console.log("FACE VERIFICATION RESPONSE:", data);
+
       if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message);
+        throw new Error(
+          Array.isArray(data.detail)
+            ? data.detail
+                .map((item) => item.msg)
+                .join(", ")
+            : data.detail ||
+                "Face verification failed."
+        );
       }
 
-      setStatus("verified");
+      const verified =
+        data.face_match === true ||
+        data.state === "FACE_VERIFIED";
 
+      if (!verified) {
+        throw new Error(
+          "Your face could not be verified against the registered identity."
+        );
+      }
+
+      const score =
+        typeof data.face_score === "number"
+          ? data.face_score
+          : null;
+
+      setFaceScore(score);
+      setStatus("verified");
     } catch (err) {
-      console.error(err);
+      console.error("Face verification failed:", err);
 
       setStatus("idle");
       setCaptured(false);
 
       setError(
-        "Face verification failed. Please try again."
+        err.message ||
+          "Face verification failed. Please try again."
       );
     }
   };
@@ -132,6 +224,7 @@ function FaceVerification() {
   const handleRetry = () => {
     setCaptured(false);
     setStatus("idle");
+    setFaceScore(null);
     setError("");
     startCamera();
   };
@@ -302,7 +395,9 @@ function FaceVerification() {
                   </p>
 
                   <p className="mt-1 text-3xl font-bold text-green-900">
-                    97.8%
+                    {faceScore !== null
+                      ? `${faceScore.toFixed(1)}%`
+                      : "Verified"}
                   </p>
 
                   <p className="mt-1 text-sm text-green-700">

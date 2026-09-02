@@ -21,7 +21,10 @@ import cv2
 ocr = PaddleOCR(
     lang="en",
     device="cpu",
-    enable_mkldnn=False
+    enable_mkldnn=False,
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False
 )
 
 
