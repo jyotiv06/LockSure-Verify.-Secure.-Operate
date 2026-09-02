@@ -1,12 +1,7 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-// Customer pages
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import DocumentVerification from "./pages/DocumentVerification";
@@ -14,40 +9,21 @@ import FaceVerification from "./pages/FaceVerification";
 import VerificationResult from "./pages/VerificationResult";
 import LockerStatus from "./pages/LockerStatus";
 
-// Officer pages
-import OfficerLogin from "./pages/officer/OfficerLogin";
-import OfficerDashboard from "./pages/officer/OfficerDashboard";
-import CustomerSearch from "./pages/officer/CustomerSearch";
-import CustomerVerification from "./pages/officer/CustomerVerification";
-import LockerOperation from "./pages/officer/LockerOperation";
-import SecurityAlerts from "./pages/officer/SecurityAlerts";
-import AuditHistory from "./pages/officer/AuditHistory";
-
 function App() {
   return (
     <BrowserRouter>
-
       <Routes>
 
-        {/* ========================= */}
-        {/* CUSTOMER PORTAL            */}
-        {/* ========================= */}
+        {/* Authentication */}
+        <Route path="/" element={<Login />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        <Route
-          path="/"
-          element={<Login />}
-        />
+        {/* Customer Portal */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
 
-        <Route
-          path="/dashboard"
-          element={<Dashboard />}
-        />
-
-        <Route
-          path="/profile"
-          element={<Profile />}
-        />
-
+        {/* Verification Flow */}
         <Route
           path="/document-verification"
           element={<DocumentVerification />}
@@ -68,72 +44,7 @@ function App() {
           element={<LockerStatus />}
         />
 
-        {/* ========================= */}
-        {/* OFFICER PORTAL             */}
-        {/* ========================= */}
-
-        <Route
-          path="/officer"
-          element={
-            <Navigate
-              to="/officer/login"
-              replace
-            />
-          }
-        />
-
-        <Route
-          path="/officer/login"
-          element={<OfficerLogin />}
-        />
-
-        <Route
-          path="/officer/dashboard"
-          element={<OfficerDashboard />}
-        />
-
-        <Route
-          path="/officer/customers"
-          element={<CustomerSearch />}
-        />
-
-        <Route
-          path="/officer/verification"
-          element={<CustomerVerification />}
-        />
-
-        <Route
-          path="/officer/lockers"
-          element={<LockerOperation />}
-        />
-
-        <Route
-          path="/officer/alerts"
-          element={<SecurityAlerts />}
-        />
-
-        <Route
-          path="/officer/history"
-          element={<AuditHistory />}
-        />
-        <Route
-          path="/officer/login"
-          element={<OfficerLogin />}
-/>
-
-        {/* Unknown route */}
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
-        />
-
       </Routes>
-
     </BrowserRouter>
   );
 }

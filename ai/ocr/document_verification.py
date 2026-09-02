@@ -236,7 +236,7 @@ def verify_document(image, customer_data):
                 if not pages:
                     raise ValueError("PDF contains no readable pages")
 
-                temp_image = "/tmp/document_page.png"
+                temp_image = str(Path("document_page.png").resolve())
 
                 pages[0].save(
                     temp_image,

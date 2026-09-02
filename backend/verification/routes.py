@@ -10,12 +10,17 @@ from .service import (
     finalize_verification,
 )
 
-router = APIRouter(prefix="/verification", tags=["Verification"])
+router = APIRouter(
+    prefix="/verification",
+    tags=["Verification"]
+)
 
 
 class VerificationStartRequest(BaseModel):
     customer_id: int
-    locker_id: int
+    locker_id: str
+
+    # Risk / intelligence inputs
     account_status: str = "ACTIVE"
     failed_attempts: int = Field(default=0, ge=0)
     access_attempts_last_hour: int = Field(default=0, ge=0)
@@ -36,7 +41,8 @@ class FaceResultRequest(BaseModel):
 
 @router.post("/start")
 def start(request: VerificationStartRequest):
-    return start_verification(
+
+    result = start_verification(
         customer_id=request.customer_id,
         locker_id=request.locker_id,
         account_status=request.account_status,
@@ -45,44 +51,82 @@ def start(request: VerificationStartRequest):
         customer_data=request.customer_data,
     )
 
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer or locker not found"
+        )
+
+    return result
+
 
 @router.get("/{verification_id}")
 def get_session(verification_id: str):
+
     session = get_verification(verification_id)
+
     if not session:
-        raise HTTPException(status_code=404, detail="Verification not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Verification not found"
+        )
+
     return session
 
 
 @router.post("/{verification_id}/document")
-def document_result(verification_id: str, request: DocumentResultRequest):
+def document_result(
+    verification_id: str,
+    request: DocumentResultRequest
+):
+
     session = process_document(
         verification_id=verification_id,
         document_match=request.document_match,
         image_path=request.image_path,
         customer_data=request.customer_data,
     )
+
     if not session:
-        raise HTTPException(status_code=404, detail="Verification not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Verification not found or document not found"
+        )
+
     return session
 
 
 @router.post("/{verification_id}/face")
-def face_result(verification_id: str, request: FaceResultRequest):
+def face_result(
+    verification_id: str,
+    request: FaceResultRequest
+):
+
     session = process_face(
         verification_id=verification_id,
         face_match=request.face_match,
         reference_image=request.reference_image,
         live_image=request.live_image,
     )
+
     if not session:
-        raise HTTPException(status_code=404, detail="Verification not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Verification not found"
+        )
+
     return session
 
 
 @router.post("/{verification_id}/finalize")
 def finalize(verification_id: str):
+
     session = finalize_verification(verification_id)
+
     if not session:
-        raise HTTPException(status_code=404, detail="Verification not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Verification not found"
+        )
+
     return session

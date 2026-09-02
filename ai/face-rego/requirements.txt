@@ -5,3 +5,7 @@ pandas
 Pillow
 tensorflow
 tf-keras
+fastapi
+uvicorn
+python-multipart
+requests

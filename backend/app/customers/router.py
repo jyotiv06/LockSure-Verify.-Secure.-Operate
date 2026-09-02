@@ -13,8 +13,10 @@ def get_my_profile(
     current_user=Depends(get_current_user),
 ):
     return {
-        "message": "Customer profile endpoint",
-        "user": current_user,
+        "email": current_user.get("user_id"),
+        "customer_id": "CUST1001",
+        "full_name": "Nirali Purkar",
+        "account_status": "ACTIVE",
     }
 
 

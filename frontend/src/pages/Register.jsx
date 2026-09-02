@@ -1,42 +1,80 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginCustomer } from "../api/auth";
+import axios from "axios";
 
-function Login() {
+function Register() {
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+
     setError("");
+    setSuccess("");
+  };
 
-    if (!email || !password) {
-      setError("Please enter your email and password.");
+  const handleRegister = async (e) => {
+    e.preventDefault();
+
+    setError("");
+    setSuccess("");
+
+    const { email, password, confirmPassword } = formData;
+
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must contain at least 6 characters.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const data = await loginCustomer(email, password);
+      await axios.post("http://127.0.0.1:8000/auth/register", {
+        email,
+        password,
+        role: "CUSTOMER",
+      });
 
-      // Store JWT received from backend
-      localStorage.setItem("token", data.access_token);
+      setSuccess("Registration successful! Redirecting to login...");
 
-      // Login successful
-      navigate("/dashboard");
-    } catch (error) {
-      if (error.response?.status === 401) {
-        setError("Invalid email or password.");
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+    } catch (err) {
+      if (err.response?.data?.detail) {
+        setError(
+          typeof err.response.data.detail === "string"
+            ? err.response.data.detail
+            : "Registration failed. Please check your details."
+        );
       } else {
         setError(
-          "Unable to connect to the server. Please try again later."
+          "Unable to connect to the server. Please make sure the backend is running."
         );
       }
     } finally {
@@ -71,25 +109,22 @@ function Login() {
           <div className="space-y-5">
 
             <div className="flex items-start gap-4">
-
               <div className="bg-blue-700 rounded-full p-2">
                 ✓
               </div>
 
               <div>
                 <h3 className="font-semibold">
-                  Secure Verification
+                  Secure Registration
                 </h3>
 
                 <p className="text-sm text-blue-200">
-                  Your identity is verified securely.
+                  Create your secure customer account.
                 </p>
               </div>
-
             </div>
 
             <div className="flex items-start gap-4">
-
               <div className="bg-blue-700 rounded-full p-2">
                 ✓
               </div>
@@ -100,14 +135,12 @@ function Login() {
                 </h3>
 
                 <p className="text-sm text-blue-200">
-                  Manage your locker operations digitally.
+                  Access and manage your locker digitally.
                 </p>
               </div>
-
             </div>
 
             <div className="flex items-start gap-4">
-
               <div className="bg-blue-700 rounded-full p-2">
                 ✓
               </div>
@@ -118,17 +151,15 @@ function Login() {
                 </h3>
 
                 <p className="text-sm text-blue-200">
-                  Built with security at every step.
+                  Your account is protected with secure authentication.
                 </p>
               </div>
-
             </div>
 
           </div>
-
         </div>
 
-        {/* Login Section */}
+        {/* Registration Section */}
         <div className="w-full md:w-1/2 p-8 sm:p-12">
 
           {/* Mobile Logo */}
@@ -147,14 +178,14 @@ function Login() {
           <div className="max-w-md mx-auto">
 
             <h2 className="text-3xl font-bold text-gray-900">
-              Welcome back
+              Create account
             </h2>
 
             <p className="text-gray-500 mt-2 mb-8">
-              Sign in to access your customer portal.
+              Register to access your digital locker portal.
             </p>
 
-            <form onSubmit={handleLogin}>
+            <form onSubmit={handleRegister}>
 
               {/* Email */}
               <div className="mb-5">
@@ -165,11 +196,9 @@ function Login() {
 
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError("");
-                  }}
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
                   placeholder="Enter your email address"
                   className="w-full border border-gray-300 rounded-xl px-4 py-3.5 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
                 />
@@ -187,12 +216,10 @@ function Login() {
 
                   <input
                     type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setError("");
-                    }}
-                    placeholder="Enter your password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Create a password"
                     className="w-full border border-gray-300 rounded-xl px-4 py-3.5 pr-20 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
                   />
 
@@ -208,54 +235,83 @@ function Login() {
 
               </div>
 
+              {/* Confirm Password */}
+              <div className="mb-5">
+
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Confirm Password
+                </label>
+
+                <div className="relative">
+
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Confirm your password"
+                    className="w-full border border-gray-300 rounded-xl px-4 py-3.5 pr-20 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </button>
+
+                </div>
+
+              </div>
+
               {/* Error */}
               {error && (
                 <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-
-                  <span className="font-bold">
-                    !
-                  </span>
-
-                  <span>
-                    {error}
-                  </span>
-
+                  <span className="font-bold">!</span>
+                  <span>{error}</span>
                 </div>
               )}
 
-              {/* Login Button */}
+              {/* Success */}
+              {success && (
+                <div className="mb-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+                  <span className="font-bold">✓</span>
+                  <span>{success}</span>
+                </div>
+              )}
+
+              {/* Register Button */}
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full rounded-xl bg-blue-700 py-3.5 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-400"
               >
-
                 {loading ? (
                   <span className="flex items-center justify-center gap-3">
-
                     <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-
-                    Signing in...
-
+                    Creating Account...
                   </span>
                 ) : (
-                  "Sign In"
+                  "Create Account"
                 )}
-
               </button>
 
             </form>
 
-            {/* Information */}
-            <div className="mt-8 rounded-xl bg-blue-50 border border-blue-100 p-4">
+            {/* Login Link */}
+            <div className="text-center mt-8">
 
-              <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">
-                Secure Customer Portal
-              </p>
-
-              <p className="text-sm text-gray-600">
-                Sign in using the email address registered with your
-                LockSure account.
+              <p className="text-sm text-gray-500">
+                Already have an account?{" "}
+                <button
+                  onClick={() => navigate("/")}
+                  className="font-semibold text-blue-600 hover:text-blue-800"
+                >
+                  Sign In
+                </button>
               </p>
 
             </div>
@@ -265,13 +321,11 @@ function Login() {
             </p>
 
           </div>
-
         </div>
 
       </div>
-
     </div>
   );
 }
 
-export default Login;
+export default Register;
