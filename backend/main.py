@@ -9,6 +9,7 @@ from .accounts.router import router as account_router
 
 from verification.routes import router as verification_router
 from audit.routes import router as audit_router
+from locker.routes import router as locker_router
 
 
 app = FastAPI(
@@ -18,7 +19,10 @@ app = FastAPI(
 )
 
 
-# Allow React frontend to communicate with FastAPI
+# ============================================================
+# CORS
+# ============================================================
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -31,21 +35,51 @@ app.add_middleware(
 )
 
 
-# Authentication
+# ============================================================
+# AUTHENTICATION
+# ============================================================
+
 app.include_router(auth_router)
 
-# Customer APIs
+
+# ============================================================
+# CUSTOMER
+# ============================================================
+
 app.include_router(customer_router)
 
-# Account APIs
+
+# ============================================================
+# ACCOUNT
+# ============================================================
+
 app.include_router(account_router)
 
-# Verification APIs
+
+# ============================================================
+# VERIFICATION
+# ============================================================
+
 app.include_router(verification_router)
 
-# Audit APIs
+
+# ============================================================
+# AUDIT
+# ============================================================
+
 app.include_router(audit_router)
 
+
+# ============================================================
+# LOCKER OPERATIONS
+# ============================================================
+
+app.include_router(locker_router)
+
+
+# ============================================================
+# ROOT
+# ============================================================
 
 @app.get("/")
 def root():
@@ -53,6 +87,10 @@ def root():
         "message": "LockSure API running"
     }
 
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
 
 @app.get("/health")
 def health():

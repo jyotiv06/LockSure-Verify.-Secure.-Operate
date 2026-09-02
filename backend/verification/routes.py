@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 
 from .service import (
     start_verification,
@@ -8,7 +9,6 @@ from .service import (
     process_face,
     finalize_verification,
 )
-
 
 router = APIRouter(
     prefix="/verification",
@@ -20,20 +20,35 @@ class VerificationStartRequest(BaseModel):
     customer_id: int
     locker_id: str
 
+    # Risk / intelligence inputs
+    account_status: str = "ACTIVE"
+    failed_attempts: int = Field(default=0, ge=0)
+    access_attempts_last_hour: int = Field(default=0, ge=0)
+    customer_data: Optional[dict] = None
+
 
 class DocumentResultRequest(BaseModel):
-    document_match: bool
+    document_match: Optional[bool] = None
+    image_path: Optional[str] = None
+    customer_data: Optional[dict] = None
 
 
 class FaceResultRequest(BaseModel):
-    face_match: bool
+    face_match: Optional[bool] = None
+    reference_image: Optional[str] = None
+    live_image: Optional[str] = None
 
 
 @router.post("/start")
 def start(request: VerificationStartRequest):
+
     result = start_verification(
-        request.customer_id,
-        request.locker_id
+        customer_id=request.customer_id,
+        locker_id=request.locker_id,
+        account_status=request.account_status,
+        failed_attempts=request.failed_attempts,
+        access_attempts_last_hour=request.access_attempts_last_hour,
+        customer_data=request.customer_data,
     )
 
     if not result:
@@ -66,8 +81,10 @@ def document_result(
 ):
 
     session = process_document(
-        verification_id,
-        request.document_match
+        verification_id=verification_id,
+        document_match=request.document_match,
+        image_path=request.image_path,
+        customer_data=request.customer_data,
     )
 
     if not session:
@@ -86,8 +103,10 @@ def face_result(
 ):
 
     session = process_face(
-        verification_id,
-        request.face_match
+        verification_id=verification_id,
+        face_match=request.face_match,
+        reference_image=request.reference_image,
+        live_image=request.live_image,
     )
 
     if not session:
@@ -102,9 +121,7 @@ def face_result(
 @router.post("/{verification_id}/finalize")
 def finalize(verification_id: str):
 
-    session = finalize_verification(
-        verification_id
-    )
+    session = finalize_verification(verification_id)
 
     if not session:
         raise HTTPException(
