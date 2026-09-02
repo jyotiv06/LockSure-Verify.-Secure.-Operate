@@ -2,430 +2,534 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Navbar from "../components/Navbar";
+import { getCurrentCustomer } from "../api/customer";
 
 const API_BASE = "http://127.0.0.1:8000";
 
 function VerificationResult() {
   const navigate = useNavigate();
 
-  const [result, setResult] = useState(null);
+  const [customer, setCustomer] = useState(null);
+  const [verification, setVerification] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [finalizing, setFinalizing] = useState(false);
   const [error, setError] = useState("");
 
+  const token = localStorage.getItem("token");
+
+  const getVerificationId = () => {
+    return localStorage.getItem("verification_id");
+  };
+
   useEffect(() => {
-    const finalize = async () => {
-      const verificationId =
-        localStorage.getItem("verification_id");
+    loadVerification();
+  }, []);
+
+  const loadVerification = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const verificationId = getVerificationId();
+
+      if (!token) {
+        throw new Error("Login session not found.");
+      }
 
       if (!verificationId) {
-        setError("Verification session not found.");
-        setLoading(false);
-        return;
+        throw new Error("Verification session not found.");
       }
 
-      try {
-        const response = await fetch(
-          `${API_BASE}/verification/${verificationId}/finalize`,
-          {
-            method: "POST",
-          }
-        );
+      const customerData = await getCurrentCustomer(token);
+      setCustomer(customerData);
 
-        if (!response.ok) {
-          const message = await response.text();
-          throw new Error(message);
+      const response = await fetch(
+        `${API_BASE}/verification/${verificationId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
+      );
 
-        const data = await response.json();
+      const data = await response.json();
 
-        setResult(data);
+      console.log("VERIFICATION RESULT STATUS:", response.status);
+      console.log("VERIFICATION RESULT RESPONSE:", data);
 
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          "Unable to finalize verification. Please make sure document and face verification are complete."
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Unable to load verification."
         );
-
-      } finally {
-        setLoading(false);
       }
-    };
 
-    finalize();
-  }, []);
+      setVerification(data);
+    } catch (err) {
+      console.error("LOAD VERIFICATION ERROR:", err);
+      setError(err.message || "Unable to load verification.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalize = async () => {
+    try {
+      setFinalizing(true);
+      setError("");
+
+      const verificationId = getVerificationId();
+
+      if (!token) {
+        throw new Error("Login session not found.");
+      }
+
+      if (!verificationId) {
+        throw new Error("Verification session not found.");
+      }
+
+      console.log(
+        "FINALIZING VERIFICATION:",
+        verificationId
+      );
+
+      const response = await fetch(
+        `${API_BASE}/verification/${verificationId}/finalize`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      console.log("FINALIZE STATUS:", response.status);
+      console.log("FINALIZE RESPONSE:", data);
+      console.log("FINAL STATE:", data.state);
+      console.log("FINAL DECISION:", data.risk_decision);
+      console.log("FINAL RISK LEVEL:", data.risk_level);
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail || "Final verification failed."
+        );
+      }
+
+      // IMPORTANT:
+      // Use the backend response directly as the new UI state.
+      setVerification({
+        ...data,
+        state: String(data.state || "").toUpperCase(),
+        risk_decision: String(
+          data.risk_decision || ""
+        ).toUpperCase(),
+        risk_level: String(
+          data.risk_level || ""
+        ).toUpperCase(),
+        document_match: Boolean(data.document_match),
+        face_match: Boolean(data.face_match),
+      });
+
+    } catch (err) {
+      console.error("FINALIZE ERROR:", err);
+      setError(err.message || "Final verification failed.");
+    } finally {
+      setFinalizing(false);
+    }
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
-
         <Navbar />
 
-        <main className="flex min-h-[70vh] items-center justify-center">
+        <main className="mx-auto max-w-4xl px-4 py-16">
+          <div className="rounded-3xl bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-blue-700" />
 
-          <div className="text-center">
-
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700"></div>
-
-            <p className="mt-4 text-slate-600">
-              Finalizing verification...
-            </p>
-
-          </div>
-
-        </main>
-
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-
-        <Navbar />
-
-        <main className="mx-auto max-w-3xl px-6 py-12">
-
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
-
-            <h2 className="text-2xl font-bold text-red-800">
-              Verification Error
+            <h2 className="text-xl font-bold text-slate-900">
+              Loading verification result...
             </h2>
 
-            <p className="mt-3 text-red-700">
-              {error}
+            <p className="mt-2 text-sm text-slate-500">
+              Please wait.
             </p>
-
-            <button
-              onClick={() =>
-                navigate("/dashboard")
-              }
-              className="mt-6 rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white"
-            >
-              Back to Dashboard
-            </button>
-
           </div>
-
         </main>
-
       </div>
     );
   }
 
-  const approved =
-    result?.state === "APPROVED";
+  const state = String(
+    verification?.state || ""
+  ).toUpperCase();
 
-  const riskScore =
-    Number(result?.risk_score ?? 0);
+  const documentVerified =
+    verification?.document_match === true;
+
+  const faceVerified =
+    verification?.face_match === true;
+
+  const approved =
+    state === "APPROVED";
+
+  const blocked =
+    state === "BLOCKED";
+
+  const review =
+    state === "REVIEW";
+
+  const riskLevel =
+    String(
+      verification?.risk_level || ""
+    ).toUpperCase();
 
   return (
     <div className="min-h-screen bg-slate-50">
-
       <Navbar />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* Progress */}
+        {/* HEADER */}
         <div className="mb-8">
+          <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+            Step 4 of 4
+          </p>
 
-          <div className="mb-4 flex items-center justify-between">
+          <h1 className="mt-1 text-3xl font-bold text-slate-900">
+            Verification Result
+          </h1>
 
-            <div>
+          <p className="mt-2 text-slate-500">
+            Final security assessment for your locker operation.
+          </p>
+        </div>
 
-              <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
-                Step 4 of 4
-              </p>
+        {/* ERROR */}
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+            <p className="font-semibold text-red-700">
+              Something went wrong
+            </p>
 
-              <h1 className="mt-1 text-3xl font-bold text-slate-900">
-                Final Verification
-              </h1>
+            <p className="mt-1 text-sm text-red-600">
+              {error}
+            </p>
+          </div>
+        )}
+
+        {/* CUSTOMER */}
+        {customer && (
+          <div className="mb-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="grid gap-5 sm:grid-cols-3">
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Customer
+                </p>
+
+                <p className="mt-1 font-bold text-slate-900">
+                  {customer.full_name}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Customer ID
+                </p>
+
+                <p className="mt-1 font-bold text-slate-900">
+                  {customer.customer_id}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Locker
+                </p>
+
+                <p className="mt-1 font-bold text-slate-900">
+                  {customer.locker_number || "Not assigned"}
+                </p>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* VERIFICATION CARDS */}
+        <div className="grid gap-5 md:grid-cols-3">
+
+          {/* DOCUMENT */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
+            <div className="flex items-center justify-between">
+
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  documentVerified
+                    ? "bg-green-100 text-green-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {documentVerified ? "✓" : "!"}
+              </div>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  documentVerified
+                    ? "bg-green-100 text-green-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {documentVerified
+                  ? "VERIFIED"
+                  : "PENDING"}
+              </span>
 
             </div>
 
-            <div className="hidden text-right sm:block">
+            <h3 className="mt-5 text-lg font-bold text-slate-900">
+              Document Verification
+            </h3>
 
-              <p className="text-sm text-slate-500">
-                Verification progress
-              </p>
-
-              <p className="font-bold text-green-600">
-                100%
-              </p>
-
-            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {documentVerified
+                ? "Your identity document has been successfully verified."
+                : "Document verification is pending."}
+            </p>
 
           </div>
 
-          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-            <div className="h-full w-full rounded-full bg-green-500"></div>
+          {/* FACE */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
+            <div className="flex items-center justify-between">
+
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  faceVerified
+                    ? "bg-green-100 text-green-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {faceVerified ? "✓" : "!"}
+              </div>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  faceVerified
+                    ? "bg-green-100 text-green-700"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {faceVerified
+                  ? "VERIFIED"
+                  : "PENDING"}
+              </span>
+
+            </div>
+
+            <h3 className="mt-5 text-lg font-bold text-slate-900">
+              Face Verification
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-500">
+              {faceVerified
+                ? "Your face successfully matched the registered identity."
+                : "Face verification is pending."}
+            </p>
+
+          </div>
+
+          {/* RISK */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+
+            <div className="flex items-center justify-between">
+
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                  approved
+                    ? "bg-green-100 text-green-700"
+                    : blocked
+                    ? "bg-red-100 text-red-700"
+                    : review
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-blue-100 text-blue-700"
+                }`}
+              >
+                {approved
+                  ? "✓"
+                  : blocked
+                  ? "!"
+                  : review
+                  ? "!"
+                  : "?"}
+              </div>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  approved
+                    ? "bg-green-100 text-green-700"
+                    : blocked
+                    ? "bg-red-100 text-red-700"
+                    : review
+                    ? "bg-yellow-100 text-yellow-700"
+                    : "bg-blue-100 text-blue-700"
+                }`}
+              >
+                {riskLevel || "PENDING"}
+              </span>
+
+            </div>
+
+            <h3 className="mt-5 text-lg font-bold text-slate-900">
+              Risk Assessment
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-500">
+              {verification?.risk_score !== undefined
+                ? `Risk score: ${verification.risk_score}`
+                : "Final security assessment of your locker operation."}
+            </p>
+
           </div>
 
         </div>
 
-        {/* Result Banner */}
+        {/* FINAL STATUS */}
         <div
-          className={`mb-6 overflow-hidden rounded-3xl p-8 text-white shadow-lg ${
+          className={`mt-6 rounded-3xl border p-8 ${
             approved
-              ? "bg-gradient-to-r from-green-600 to-emerald-500"
-              : "bg-gradient-to-r from-red-600 to-red-500"
+              ? "border-green-200 bg-green-50"
+              : blocked
+              ? "border-red-200 bg-red-50"
+              : review
+              ? "border-yellow-200 bg-yellow-50"
+              : "border-blue-200 bg-blue-50"
           }`}
         >
 
-          <div className="flex flex-col items-center text-center sm:flex-row sm:text-left">
+          <div className="text-center">
 
-            <div className="mb-5 flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/20 text-5xl sm:mb-0 sm:mr-6">
-              {approved ? "✓" : "!"}
+            <div
+              className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full text-4xl ${
+                approved
+                  ? "bg-green-100 text-green-700"
+                  : blocked
+                  ? "bg-red-100 text-red-700"
+                  : review
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-blue-100 text-blue-700"
+              }`}
+            >
+              {approved
+                ? "✓"
+                : blocked
+                ? "!"
+                : review
+                ? "!"
+                : "?"}
             </div>
 
-            <div>
+            <h2 className="mt-5 text-2xl font-bold text-slate-900">
 
-              <p className="text-sm font-semibold uppercase tracking-widest">
-                Verification Complete
-              </p>
+              {approved
+                ? "Verification Successful"
+                : blocked
+                ? "Locker Operation Blocked"
+                : review
+                ? "Manual Review Required"
+                : "Verification Ready"}
 
-              <h2 className="mt-1 text-3xl font-bold">
-                {approved
-                  ? "Operation Approved"
-                  : result?.state || "Verification Review"}
-              </h2>
+            </h2>
 
-              <p className="mt-2">
-                {result?.reason}
-              </p>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
 
+              {approved
+                ? "Your identity has been successfully verified. The locker operation is approved."
+                : blocked
+                ? "The verification system detected a security concern. The locker operation cannot proceed."
+                : review
+                ? "Your verification requires officer review before the locker operation can proceed."
+                : "All verification information has been collected. Complete the final verification to continue."}
+
+            </p>
+
+            {/* DEBUG INFORMATION - useful during integration */}
+            <div className="mt-5 text-xs text-slate-400">
+              Verification ID: {verification?.verification_id || "—"}
+              {" · "}
+              State: {state || "—"}
             </div>
 
           </div>
 
         </div>
 
-        {/* Summary */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        {/* ACTIONS */}
+        <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-between">
 
-          <div className="mb-7">
-
-            <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
-              Verification Summary
-            </p>
-
-            <h2 className="mt-1 text-2xl font-bold text-slate-900">
-              Identity & Account Checks
-            </h2>
-
-          </div>
-
-          <div className="space-y-4">
-
-            {/* Document */}
-            <div className="flex items-center justify-between rounded-2xl border border-green-100 bg-green-50 p-5">
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
-                  {result?.document_match ? "✓" : "!"}
-                </div>
-
-                <div>
-
-                  <p className="font-bold text-slate-800">
-                    Document Verification
-                  </p>
-
-                  <p className="text-sm text-slate-500">
-                    Identity document successfully verified
-                  </p>
-
-                </div>
-
-              </div>
-
-              <span className="rounded-full bg-green-100 px-4 py-2 text-xs font-bold text-green-700">
-                {result?.document_match
-                  ? "VERIFIED"
-                  : "FAILED"}
-              </span>
-
-            </div>
-
-            {/* Face */}
-            <div className="flex items-center justify-between rounded-2xl border border-green-100 bg-green-50 p-5">
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
-                  {result?.face_match ? "✓" : "!"}
-                </div>
-
-                <div>
-
-                  <p className="font-bold text-slate-800">
-                    Face Verification
-                  </p>
-
-                  <p className="text-sm text-slate-500">
-                    Identity successfully matched
-                  </p>
-
-                </div>
-
-              </div>
-
-              <span className="rounded-full bg-green-100 px-4 py-2 text-xs font-bold text-green-700">
-                {result?.face_match
-                  ? "VERIFIED"
-                  : "FAILED"}
-              </span>
-
-            </div>
-
-          </div>
-
-          {/* Risk */}
-          <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
-
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-
-              <div>
-
-                <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">
-                  Risk Assessment
-                </p>
-
-                <div className="mt-2 flex items-center gap-3">
-
-                  <span className="h-4 w-4 rounded-full bg-green-500"></span>
-
-                  <span className="text-2xl font-bold text-green-700">
-                    {result?.risk_level || "UNKNOWN"} RISK
-                  </span>
-
-                </div>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  {result?.reason}
-                </p>
-
-              </div>
-
-              <div className="text-left sm:text-right">
-
-                <p className="text-sm text-slate-500">
-                  Risk Score
-                </p>
-
-                <p className="text-4xl font-bold text-slate-900">
-                  {riskScore}
-                  <span className="text-xl text-slate-400">
-                    /100
-                  </span>
-                </p>
-
-              </div>
-
-            </div>
-
-            <div className="mt-6">
-
-              <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-
-                <div
-                  className="h-full rounded-full bg-green-500"
-                  style={{
-                    width: `${Math.min(
-                      riskScore,
-                      100
-                    )}%`,
-                  }}
-                ></div>
-
-              </div>
-
-              <div className="mt-2 flex justify-between text-xs text-slate-400">
-                <span>Low Risk</span>
-                <span>High Risk</span>
-              </div>
-
-            </div>
-
-          </div>
-
-          {/* Final Status */}
-          <div
-            className={`mt-8 rounded-2xl border-2 p-7 text-center ${
-              approved
-                ? "border-green-200 bg-green-50"
-                : "border-red-200 bg-red-50"
-            }`}
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="rounded-xl border border-slate-300 bg-white px-6 py-3 font-semibold text-slate-700 hover:bg-slate-50"
           >
+            ← Dashboard
+          </button>
 
-            <div
-              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl text-white shadow-lg ${
-                approved
-                  ? "bg-green-500"
-                  : "bg-red-500"
-              }`}
-            >
-              {approved ? "✓" : "!"}
-            </div>
+          {/* ONLY SHOW FINALIZE BEFORE APPROVAL */}
+          {!approved &&
+            !blocked &&
+            !review &&
+            state !== "RISK_ASSESSMENT" && (
+              <button
+                onClick={handleFinalize}
+                disabled={finalizing}
+                className="rounded-xl bg-blue-700 px-7 py-3 font-semibold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {finalizing
+                  ? "Processing..."
+                  : "Complete Final Verification →"}
+              </button>
+            )}
 
-            <p
-              className={`mt-4 text-sm font-semibold uppercase tracking-widest ${
-                approved
-                  ? "text-green-700"
-                  : "text-red-700"
-              }`}
-            >
-              Final Status
-            </p>
-
-            <h2
-              className={`mt-1 text-3xl font-extrabold ${
-                approved
-                  ? "text-green-800"
-                  : "text-red-800"
-              }`}
-            >
-              {approved
-                ? "OPERATION APPROVED"
-                : result?.state}
-            </h2>
-
-            <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
-              {result?.reason}
-            </p>
-
-          </div>
-
-          {/* Buttons */}
-          <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-center">
-
+          {/* APPROVED */}
+          {approved && (
             <button
-              onClick={() =>
-                navigate("/dashboard")
-              }
-              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700"
+              onClick={() => navigate("/locker-status")}
+              className="rounded-xl bg-green-700 px-7 py-3 font-semibold text-white shadow-sm hover:bg-green-800"
             >
-              ← Back to Dashboard
+              Continue to Locker →
             </button>
+          )}
 
+          {/* REVIEW */}
+          {review && (
             <button
-              onClick={() =>
-                navigate("/locker-status")
-              }
-              disabled={!approved}
-              className="rounded-xl bg-blue-700 px-7 py-3 font-semibold text-white disabled:bg-slate-300"
+              onClick={() => navigate("/dashboard")}
+              className="rounded-xl bg-yellow-600 px-7 py-3 font-semibold text-white shadow-sm hover:bg-yellow-700"
             >
-              View Locker Status →
+              Return to Dashboard
             </button>
+          )}
 
-          </div>
+          {/* BLOCKED */}
+          {blocked && (
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="rounded-xl bg-red-600 px-7 py-3 font-semibold text-white shadow-sm hover:bg-red-700"
+            >
+              Return to Dashboard
+            </button>
+          )}
 
         </div>
 
       </main>
-
     </div>
   );
 }

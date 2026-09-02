@@ -1,10 +1,92 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Card from "../components/Card";
-import { customer } from "../data/mockData";
+import { getCurrentCustomer } from "../api/customer";
 
 function Profile() {
   const navigate = useNavigate();
+
+  const [customer, setCustomer] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadCustomer = async () => {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      try {
+        setError("");
+
+        const data = await getCurrentCustomer(token);
+
+        console.log("PROFILE CUSTOMER:", data);
+
+        setCustomer(data);
+      } catch (err) {
+        console.error("Failed to load customer profile:", err);
+
+        setError(
+          err.message || "Unable to load your profile."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCustomer();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+
+        <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+            <p className="text-slate-500">
+              Loading your profile...
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+
+        <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+            <h2 className="text-lg font-bold text-red-900">
+              Unable to load profile
+            </h2>
+
+            <p className="mt-2 text-sm text-red-700">
+              {error || "Customer profile not found."}
+            </p>
+
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="mt-5 rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white transition hover:bg-blue-800"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const accountActive =
+    String(customer.account_status || "").toUpperCase() === "ACTIVE";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -31,6 +113,7 @@ function Profile() {
         {/* Profile Card */}
         <Card>
 
+          {/* Customer Header */}
           <div className="flex flex-col gap-5 border-b border-slate-100 pb-6 sm:flex-row sm:items-center">
 
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 text-2xl">
@@ -39,18 +122,33 @@ function Profile() {
 
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
-                {customer.name}
+                {customer.full_name}
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Customer ID: {customer.customerId}
+                Customer ID: {customer.customer_id}
               </p>
             </div>
 
             <div className="sm:ml-auto">
-              <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-semibold text-green-700">
-                <span className="h-2 w-2 rounded-full bg-green-500"></span>
-                Account Active
+              <span
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${
+                  accountActive
+                    ? "bg-green-50 text-green-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    accountActive
+                      ? "bg-green-500"
+                      : "bg-red-500"
+                  }`}
+                ></span>
+
+                {accountActive
+                  ? "Account Active"
+                  : "Account Inactive"}
               </span>
             </div>
 
@@ -71,7 +169,7 @@ function Profile() {
                 </p>
 
                 <p className="mt-2 font-semibold text-slate-800">
-                  {customer.name}
+                  {customer.full_name || "—"}
                 </p>
               </div>
 
@@ -81,7 +179,7 @@ function Profile() {
                 </p>
 
                 <p className="mt-2 font-semibold text-slate-800">
-                  {customer.customerId}
+                  {customer.customer_id || "—"}
                 </p>
               </div>
 
@@ -91,17 +189,37 @@ function Profile() {
                 </p>
 
                 <p className="mt-2 font-semibold text-slate-800">
-                  {customer.accountNumber}
+                  {customer.account_number || "Not available"}
                 </p>
               </div>
 
               <div className="rounded-xl bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Branch
+                  Email
+                </p>
+
+                <p className="mt-2 font-semibold text-slate-800 break-all">
+                  {customer.email || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Phone
                 </p>
 
                 <p className="mt-2 font-semibold text-slate-800">
-                  {customer.branch}
+                  {customer.phone || "—"}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Account Status
+                </p>
+
+                <p className="mt-2 font-semibold text-slate-800">
+                  {customer.account_status || "—"}
                 </p>
               </div>
 
@@ -124,7 +242,7 @@ function Profile() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-blue-900">
-                  {customer.lockerNumber}
+                  {customer.locker_number || "Not assigned"}
                 </p>
               </div>
 
@@ -134,11 +252,23 @@ function Profile() {
                 </p>
 
                 <p className="mt-2 text-2xl font-bold text-orange-900">
-                  OCCUPIED
+                  {customer.locker_status || "NOT ASSIGNED"}
                 </p>
               </div>
 
             </div>
+
+            {customer.branch && (
+              <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Branch
+                </p>
+
+                <p className="mt-2 font-semibold text-slate-800">
+                  {customer.branch}
+                </p>
+              </div>
+            )}
 
           </div>
 
@@ -162,6 +292,11 @@ function Profile() {
                     To securely operate your locker, you need to complete
                     document and face verification.
                   </p>
+
+                  <p className="mt-2 text-xs font-medium text-blue-600">
+                    Current verification status:{" "}
+                    {customer.verification_status || "NOT_STARTED"}
+                  </p>
                 </div>
 
               </div>
@@ -182,7 +317,8 @@ function Profile() {
 
             <button
               onClick={() => navigate("/document-verification")}
-              className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95"
+              disabled={!customer.locker_number}
+              className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
             >
               Continue to Document Verification →
             </button>

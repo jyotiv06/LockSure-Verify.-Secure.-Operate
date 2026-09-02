@@ -372,40 +372,42 @@ def process_document(
             )
 
         # -------------------------------
-        # SAVE RESULT
+        # -------------------------------
+        # FIND OR CREATE CUSTOMER DOCUMENT
         # -------------------------------
 
         document = (
             db.query(Document)
-            .filter(
-                Document.customer_id == session.customer_id
-            )
-            .order_by(
-                Document.document_id.desc()
-            )
+            .filter(Document.customer_id == session.customer_id)
+            .order_by(Document.document_id.desc())
             .first()
         )
 
+        # Fresh customers may not have a document row yet.
+        # Create a document record automatically for this verification.
         if not document:
-            return None
+            document = Document(
+                customer_id=session.customer_id,
+                document_type="IDENTITY_DOCUMENT",
+                document_number=f"VERIFICATION-{session.session_id}",
+                document_reference=image_path,
+                verified=False,
+            )
+            db.add(document)
+            db.flush()
+
+        # -------------------------------
+        # SAVE DOCUMENT VERIFICATION
+        # -------------------------------
 
         verification = DocumentVerification(
             session_id=session.session_id,
             document_id=document.document_id,
-            match_score=(
-                100.00
-                if document_match
-                else 0.00
-            ),
-            result=(
-                "PASSED"
-                if document_match
-                else "FAILED"
-            ),
+            match_score=100.00 if document_match else 0.00,
+            result="PASSED" if document_match else "FAILED",
         )
 
         db.add(verification)
-
         document.verified = bool(document_match)
 
         session.status = (
@@ -418,32 +420,23 @@ def process_document(
 
         locker = (
             db.query(Locker)
-            .filter(
-                Locker.locker_id == session.locker_id
-            )
+            .filter(Locker.locker_id == session.locker_id)
             .first()
         )
 
         _audit(
             session,
             locker.locker_number if locker else None,
-            (
-                "DOCUMENT_VERIFIED"
-                if document_match
-                else "DOCUMENT_FAILED"
-            ),
-            (
-                "Document verification passed."
-                if document_match
-                else "Document verification failed."
-            ),
+            "DOCUMENT_VERIFIED" if document_match else "DOCUMENT_FAILED",
+            "Document verification passed."
+            if document_match
+            else "Document verification failed.",
         )
 
         return get_verification(verification_id)
 
     finally:
         db.close()
-
 
 def process_face(
     verification_id: str,
@@ -586,15 +579,13 @@ def process_face(
 
 
 def finalize_verification(verification_id: str):
-
     db: Session = get_db()
 
     try:
         session = (
             db.query(VerificationSession)
             .filter(
-                VerificationSession.session_id
-                == int(verification_id)
+                VerificationSession.session_id == int(verification_id)
             )
             .first()
         )
@@ -602,20 +593,14 @@ def finalize_verification(verification_id: str):
         if not session:
             return None
 
-        if session.status != "FACE_VERIFIED":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Finalization is allowed only after "
-                    "document and face verification."
-                ),
-            )
+        # --------------------------------------------------------
+        # GET ACTUAL VERIFICATION RESULTS
+        # --------------------------------------------------------
 
         document = (
             db.query(DocumentVerification)
             .filter(
-                DocumentVerification.session_id
-                == session.session_id
+                DocumentVerification.session_id == session.session_id
             )
             .order_by(
                 DocumentVerification.document_verification_id.desc()
@@ -626,8 +611,7 @@ def finalize_verification(verification_id: str):
         face = (
             db.query(FaceVerification)
             .filter(
-                FaceVerification.session_id
-                == session.session_id
+                FaceVerification.session_id == session.session_id
             )
             .order_by(
                 FaceVerification.face_verification_id.desc()
@@ -644,6 +628,23 @@ def finalize_verification(verification_id: str):
             face is not None
             and face.result == "PASSED"
         )
+
+        # --------------------------------------------------------
+        # VALIDATE ACTUAL RESULTS
+        # --------------------------------------------------------
+
+        if not document_match or not face_match:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Finalization is allowed only after "
+                    "document and face verification."
+                ),
+            )
+
+        # --------------------------------------------------------
+        # GET RISK / SECURITY CONTEXT
+        # --------------------------------------------------------
 
         context = verification_contexts.get(
             verification_id,
@@ -671,6 +672,10 @@ def finalize_verification(verification_id: str):
             ),
         }
 
+        # --------------------------------------------------------
+        # START RISK ASSESSMENT
+        # --------------------------------------------------------
+
         session.status = "RISK_ASSESSMENT"
         db.commit()
 
@@ -695,9 +700,9 @@ def finalize_verification(verification_id: str):
             "Risk assessment started.",
         )
 
-        # -------------------------------
+        # --------------------------------------------------------
         # RISK ENGINE
-        # -------------------------------
+        # --------------------------------------------------------
 
         try:
             risk_result = calculate_risk_real(
@@ -715,9 +720,32 @@ def finalize_verification(verification_id: str):
                 detail="Risk engine returned an invalid result.",
             )
 
-        # -------------------------------
-        # SUSPICIOUS ACTIVITY ENGINE
-        # -------------------------------
+        # --------------------------------------------------------
+        # EXTRACT RISK RESULT
+        # --------------------------------------------------------
+
+        risk_score = float(
+            risk_result.get(
+                "risk_score",
+                risk_result.get("score", 10.0),
+            )
+        )
+
+        risk_level = str(
+            risk_result.get(
+                "risk_level",
+                "LOW",
+            )
+        ).upper()
+
+        reason = risk_result.get(
+            "reason",
+            "Document and face verification passed.",
+        )
+
+        # --------------------------------------------------------
+        # SUSPICIOUS ACTIVITY
+        # --------------------------------------------------------
 
         try:
             suspicious_result = detect_suspicious_real(
@@ -727,70 +755,53 @@ def finalize_verification(verification_id: str):
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    "Suspicious activity engine error: "
-                    f"{str(error)}"
+                    f"Suspicious activity engine error: {str(error)}"
                 ),
             )
 
         if not isinstance(suspicious_result, dict):
-            suspicious_result = {
-                "severity": "LOW"
-            }
-
-        risk_score = float(
-            risk_result.get(
-                "risk_score",
-                50.00,
-            )
-        )
-
-        risk_level = str(
-            risk_result.get(
-                "risk_level",
-                "MEDIUM",
-            )
-        ).upper()
-
-        decision = str(
-            risk_result.get(
-                "decision",
-                "REVIEW",
-            )
-        ).upper()
+            suspicious_result = {}
 
         suspicious_severity = str(
             suspicious_result.get(
                 "severity",
-                "LOW",
+                suspicious_result.get(
+                    "risk_level",
+                    "LOW",
+                ),
             )
         ).upper()
 
-        # High suspicious activity always blocks.
-        if suspicious_severity == "HIGH":
+        suspicious = bool(
+            suspicious_result.get(
+                "suspicious",
+                False,
+            )
+        )
+
+        # --------------------------------------------------------
+        # FINAL DECISION
+        # --------------------------------------------------------
+
+        if suspicious_severity == "HIGH" or suspicious:
             decision = "BLOCK"
+            final_state = "BLOCKED"
 
-        if decision == "APPROVE":
-            state = "APPROVED"
-            reason = (
-                "Verification approved by risk assessment."
-            )
+        elif risk_level == "HIGH":
+            decision = "BLOCK"
+            final_state = "BLOCKED"
 
-        elif decision == "BLOCK":
-            state = "BLOCKED"
-            reason = (
-                "Verification blocked by risk assessment."
-            )
+        elif risk_level == "MEDIUM":
+            decision = "REVIEW"
+            final_state = "REVIEW"
 
         else:
-            decision = "REVIEW"
-            state = "REVIEW"
-            reason = (
-                "Verification requires manual review."
-            )
+            decision = "APPROVE"
+            final_state = "APPROVED"
 
-        # -------------------------------
-        # SAVE RISK RESULT
-        # -------------------------------
+        # --------------------------------------------------------
+        # SAVE RISK ASSESSMENT
+        # --------------------------------------------------------
 
         risk = RiskAssessment(
             session_id=session.session_id,
@@ -801,24 +812,26 @@ def finalize_verification(verification_id: str):
 
         db.add(risk)
 
-        session.status = state
-        session.completed_at = datetime.now()
+        # --------------------------------------------------------
+        # UPDATE SESSION
+        # --------------------------------------------------------
+
+        session.status = final_state
+
+        if final_state in [
+            "APPROVED",
+            "BLOCKED",
+            "REVIEW",
+        ]:
+            session.completed_at = datetime.now()
 
         db.commit()
 
-        _audit(
-            session,
-            locker_number,
-            "RISK_CALCULATED",
-            (
-                f"Risk score={risk_score}, "
-                f"level={risk_level}, "
-                f"decision={decision}, "
-                f"suspicious severity={suspicious_severity}."
-            ),
-        )
+        # --------------------------------------------------------
+        # AUDIT
+        # --------------------------------------------------------
 
-        if state == "APPROVED":
+        if final_state == "APPROVED":
 
             _audit(
                 session,
@@ -827,16 +840,13 @@ def finalize_verification(verification_id: str):
                 "Verification approved. Locker operation is allowed.",
             )
 
-        elif state == "REVIEW":
+        elif final_state == "REVIEW":
 
             _audit(
                 session,
                 locker_number,
                 "VERIFICATION_REVIEW",
-                (
-                    "Verification requires manual review. "
-                    "Locker remains closed."
-                ),
+                "Verification requires manual review. Locker remains closed.",
             )
 
         else:
@@ -845,10 +855,7 @@ def finalize_verification(verification_id: str):
                 session,
                 locker_number,
                 "VERIFICATION_BLOCKED",
-                (
-                    "Verification blocked. "
-                    "Locker operation is not allowed."
-                ),
+                "Verification blocked. Locker operation is not allowed.",
             )
 
             if suspicious_severity == "HIGH":
@@ -857,25 +864,10 @@ def finalize_verification(verification_id: str):
                     session,
                     locker_number,
                     "ALERT_RAISED",
-                    (
-                        "High-risk suspicious activity detected. "
-                        "Locker operation blocked."
-                    ),
+                    "High-risk suspicious activity detected. Locker operation blocked.",
                 )
 
-        return {
-            "verification_id": str(session.session_id),
-            "customer_id": session.customer_id,
-            "locker_id": locker_number,
-            "state": state,
-            "document_match": document_match,
-            "face_match": face_match,
-            "risk_decision": decision,
-            "risk_level": risk_level,
-            "risk_score": risk_score,
-            "reason": reason,
-            "suspicious_activity": suspicious_result,
-        }
+        return get_verification(verification_id)
 
     finally:
         db.close()

@@ -1,329 +1,298 @@
-
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { Link, useNavigate } from "react-router-dom";
 
 function Register() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
+    full_name: "",
     email: "",
     password: "",
-    confirmPassword: "",
+    role: "CUSTOMER",
+    phone: "",
   });
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
 
     setError("");
-    setSuccess("");
   };
 
-  const handleRegister = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setError("");
-    setSuccess("");
-
-    const { email, password, confirmPassword } = formData;
-
-    if (!email || !password || !confirmPassword) {
-      setError("Please fill in all fields.");
+    // Frontend validation
+    if (!formData.full_name.trim()) {
+      setError("Full name is required.");
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+    if (!formData.email.trim()) {
+      setError("Email is required.");
       return;
     }
 
-    if (password.length < 6) {
+    if (!formData.password) {
+      setError("Password is required.");
+      return;
+    }
+
+    if (formData.password.length < 6) {
       setError("Password must contain at least 6 characters.");
       return;
     }
 
+    if (!formData.phone.trim()) {
+      setError("Phone number is required.");
+      return;
+    }
+
     setLoading(true);
+    setError("");
+
+    // EXACT payload expected by backend
+    const payload = {
+      full_name: formData.full_name.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      role: "CUSTOMER",
+      phone: formData.phone.trim(),
+    };
+
+    console.log("REGISTER PAYLOAD:", payload);
 
     try {
-      await axios.post("http://127.0.0.1:8000/auth/register", {
-        email,
-        password,
-        role: "CUSTOMER",
-      });
+      const response = await fetch(
+        "http://127.0.0.1:8000/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
-      setSuccess("Registration successful! Redirecting to login...");
+      const data = await response.json();
 
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-    } catch (err) {
-      if (err.response?.data?.detail) {
-        setError(
-          typeof err.response.data.detail === "string"
-            ? err.response.data.detail
-            : "Registration failed. Please check your details."
-        );
-      } else {
-        setError(
-          "Unable to connect to the server. Please make sure the backend is running."
-        );
+      console.log("REGISTER RESPONSE:", data);
+
+      if (!response.ok) {
+        if (Array.isArray(data.detail)) {
+          const messages = data.detail
+            .map((item) => item.msg)
+            .join(", ");
+
+          throw new Error(messages);
+        }
+
+        throw new Error(data.detail || "Registration failed.");
       }
+
+      // Registration successful
+      navigate("/login");
+    } catch (err) {
+      console.error("Registration error:", err);
+      setError(err.message || "Unable to register. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-slate-50">
 
-      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl overflow-hidden md:flex">
+      <main className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-4 py-10">
 
-        {/* Left Branding Section */}
-        <div className="hidden md:flex md:w-1/2 bg-blue-800 text-white p-12 flex-col justify-center">
+        <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-8 shadow-lg sm:p-10">
 
-          <div className="mb-10">
+          {/* Header */}
+          <div className="mb-8 text-center">
 
-            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center mb-6">
-              <span className="text-3xl">🔐</span>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
+              🔐
             </div>
 
-            <h1 className="text-4xl font-bold mb-4">
-              LockSure
+            <h1 className="text-3xl font-bold text-slate-900">
+              Create your account
             </h1>
 
-            <p className="text-blue-100 text-lg leading-relaxed">
-              Secure, simple and trusted digital locker operations.
+            <p className="mt-2 text-slate-500">
+              Register to access your LockSure customer portal.
             </p>
 
           </div>
 
-          <div className="space-y-5">
+          {/* Error */}
+          {error && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
 
-            <div className="flex items-start gap-4">
-              <div className="bg-blue-700 rounded-full p-2">
-                ✓
-              </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
 
-              <div>
-                <h3 className="font-semibold">
-                  Secure Registration
-                </h3>
+            {/* Full Name */}
+            <div>
+              <label
+                htmlFor="full_name"
+                className="mb-2 block font-semibold text-slate-800"
+              >
+                Full Name
+              </label>
 
-                <p className="text-sm text-blue-200">
-                  Create your secure customer account.
-                </p>
-              </div>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                value={formData.full_name}
+                onChange={handleChange}
+                placeholder="Enter your full name"
+                className="w-full rounded-xl border border-slate-300 px-5 py-4 text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="bg-blue-700 rounded-full p-2">
-                ✓
-              </div>
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block font-semibold text-slate-800"
+              >
+                Email Address
+              </label>
 
-              <div>
-                <h3 className="font-semibold">
-                  Digital Locker Access
-                </h3>
-
-                <p className="text-sm text-blue-200">
-                  Access and manage your locker digitally.
-                </p>
-              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email address"
+                className="w-full rounded-xl border border-slate-300 px-5 py-4 text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
             </div>
 
-            <div className="flex items-start gap-4">
-              <div className="bg-blue-700 rounded-full p-2">
-                ✓
-              </div>
+            {/* Phone */}
+            <div>
+              <label
+                htmlFor="phone"
+                className="mb-2 block font-semibold text-slate-800"
+              >
+                Phone Number
+              </label>
 
-              <div>
-                <h3 className="font-semibold">
-                  Trusted & Protected
-                </h3>
-
-                <p className="text-sm text-blue-200">
-                  Your account is protected with secure authentication.
-                </p>
-              </div>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Enter your phone number"
+                className="w-full rounded-xl border border-slate-300 px-5 py-4 text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
             </div>
 
-          </div>
-        </div>
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-2 block font-semibold text-slate-800"
+              >
+                Password
+              </label>
 
-        {/* Registration Section */}
-        <div className="w-full md:w-1/2 p-8 sm:p-12">
-
-          {/* Mobile Logo */}
-          <div className="md:hidden text-center mb-8">
-
-            <div className="inline-flex w-14 h-14 bg-blue-100 rounded-2xl items-center justify-center mb-3">
-              <span className="text-3xl">🔐</span>
-            </div>
-
-            <h1 className="text-3xl font-bold text-blue-800">
-              LockSure
-            </h1>
-
-          </div>
-
-          <div className="max-w-md mx-auto">
-
-            <h2 className="text-3xl font-bold text-gray-900">
-              Create account
-            </h2>
-
-            <p className="text-gray-500 mt-2 mb-8">
-              Register to access your digital locker portal.
-            </p>
-
-            <form onSubmit={handleRegister}>
-
-              {/* Email */}
-              <div className="mb-5">
-
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
+              <div className="relative">
 
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
                   onChange={handleChange}
-                  placeholder="Enter your email address"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3.5 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Enter your password"
+                  className="w-full rounded-xl border border-slate-300 px-5 py-4 pr-20 text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
                 />
 
-              </div>
-
-              {/* Password */}
-              <div className="mb-5">
-
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password
-                </label>
-
-                <div className="relative">
-
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="Create a password"
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3.5 pr-20 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-blue-600 hover:text-blue-800"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-
-                </div>
-
-              </div>
-
-              {/* Confirm Password */}
-              <div className="mb-5">
-
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Confirm Password
-                </label>
-
-                <div className="relative">
-
-                  <input
-                    type={showConfirmPassword ? "text" : "password"}
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Confirm your password"
-                    className="w-full border border-gray-300 rounded-xl px-4 py-3.5 pr-20 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(!showConfirmPassword)
-                    }
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-blue-600 hover:text-blue-800"
-                  >
-                    {showConfirmPassword ? "Hide" : "Show"}
-                  </button>
-
-                </div>
-
-              </div>
-
-              {/* Error */}
-              {error && (
-                <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  <span className="font-bold">!</span>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Success */}
-              {success && (
-                <div className="mb-5 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-                  <span className="font-bold">✓</span>
-                  <span>{success}</span>
-                </div>
-              )}
-
-              {/* Register Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-blue-700 py-3.5 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-blue-400"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                    Creating Account...
-                  </span>
-                ) : (
-                  "Create Account"
-                )}
-              </button>
-
-            </form>
-
-            {/* Login Link */}
-            <div className="text-center mt-8">
-
-              <p className="text-sm text-gray-500">
-                Already have an account?{" "}
                 <button
-                  onClick={() => navigate("/")}
-                  className="font-semibold text-blue-600 hover:text-blue-800"
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 font-semibold text-blue-600"
                 >
-                  Sign In
+                  {showPassword ? "Hide" : "Show"}
                 </button>
-              </p>
 
+              </div>
+
+              <p className="mt-2 text-sm text-slate-400">
+                Password must contain at least 6 characters.
+              </p>
             </div>
 
-            <p className="text-center text-xs text-gray-400 mt-8">
-              © 2026 LockSure · Secure Locker Management
+            {/* Role - fixed CUSTOMER */}
+            <input
+              type="hidden"
+              name="role"
+              value="CUSTOMER"
+            />
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-blue-700 px-6 py-4 text-lg font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {loading ? "Creating Account..." : "Create Account"}
+            </button>
+
+          </form>
+
+          {/* Login */}
+          <div className="mt-7 text-center text-slate-500">
+
+            Already have an account?{" "}
+
+            <Link
+              to="/login"
+              className="font-semibold text-blue-700 hover:text-blue-800"
+            >
+              Sign in
+            </Link>
+
+          </div>
+
+          {/* Security Notice */}
+          <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+
+            <p className="text-sm font-bold text-blue-800">
+              SECURE CUSTOMER PORTAL
+            </p>
+
+            <p className="mt-2 text-sm leading-relaxed text-blue-700">
+              Your account information is securely processed through
+              the LockSure authentication system.
             </p>
 
           </div>
+
+          {/* Footer */}
+          <p className="mt-7 text-center text-sm text-slate-400">
+            © 2026 LockSure · Secure Locker Management
+          </p>
+
         </div>
 
-      </div>
+      </main>
+
     </div>
   );
 }
