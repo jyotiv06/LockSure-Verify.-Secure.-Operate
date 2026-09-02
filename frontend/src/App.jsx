@@ -10,6 +10,7 @@ import PortalSelection from "./pages/PortalSelection";
 
 // Customer pages
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import DocumentVerification from "./pages/DocumentVerification";
@@ -28,13 +29,15 @@ import AuditHistory from "./pages/officer/AuditHistory";
 
 
 function App() {
+
   return (
+
     <BrowserRouter>
 
       <Routes>
 
         {/* ========================= */}
-        {/* HOME / PORTAL SELECTION   */}
+        {/* HOME / PORTAL SELECTION */}
         {/* ========================= */}
 
         <Route
@@ -44,13 +47,28 @@ function App() {
 
 
         {/* ========================= */}
-        {/* CUSTOMER PORTAL           */}
+        {/* CUSTOMER AUTHENTICATION */}
         {/* ========================= */}
+
+        <Route
+          path="/login"
+          element={<Login />}
+        />
 
         <Route
           path="/customer/login"
           element={<Login />}
         />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+
+
+        {/* ========================= */}
+        {/* CUSTOMER PORTAL */}
+        {/* ========================= */}
 
         <Route
           path="/dashboard"
@@ -61,6 +79,11 @@ function App() {
           path="/profile"
           element={<Profile />}
         />
+
+
+        {/* ========================= */}
+        {/* CUSTOMER VERIFICATION FLOW */}
+        {/* ========================= */}
 
         <Route
           path="/document-verification"
@@ -84,7 +107,7 @@ function App() {
 
 
         {/* ========================= */}
-        {/* OFFICER PORTAL            */}
+        {/* OFFICER PORTAL */}
         {/* ========================= */}
 
         <Route
@@ -134,7 +157,7 @@ function App() {
 
 
         {/* ========================= */}
-        {/* UNKNOWN ROUTES            */}
+        {/* UNKNOWN ROUTES */}
         {/* ========================= */}
 
         <Route
@@ -150,7 +173,9 @@ function App() {
       </Routes>
 
     </BrowserRouter>
+
   );
+
 }
 
 
