@@ -1,10 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-<<<<<<< HEAD
-from sqlalchemy import desc, func
-=======
 from sqlalchemy import func
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
+from sqlalchemy.orm import Session
 
 from database import SessionLocal
 
@@ -24,15 +20,9 @@ router = APIRouter(
 )
 
 
-<<<<<<< HEAD
-# =====================================
-# DATABASE DEPENDENCY
-# =====================================
-=======
 # ============================================================
 # DATABASE DEPENDENCY
 # ============================================================
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
 
 def get_db():
     db = SessionLocal()
@@ -43,15 +33,9 @@ def get_db():
         db.close()
 
 
-<<<<<<< HEAD
-# =====================================
-# CURRENT CUSTOMER PROFILE
-# =====================================
-=======
 # ============================================================
 # CURRENT LOGGED-IN CUSTOMER
 # ============================================================
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
 
 @router.get("/me")
 def get_my_profile(
@@ -59,7 +43,9 @@ def get_my_profile(
     db: Session = Depends(get_db),
 ):
 
-    user_id = int(current_user["user_id"])
+    user_id = int(
+        current_user["user_id"]
+    )
 
     # --------------------------------------------------------
     # USER
@@ -67,7 +53,9 @@ def get_my_profile(
 
     user = (
         db.query(User)
-        .filter(User.user_id == user_id)
+        .filter(
+            User.user_id == user_id
+        )
         .first()
     )
 
@@ -83,7 +71,9 @@ def get_my_profile(
 
     customer = (
         db.query(Customer)
-        .filter(Customer.customer_id == user_id)
+        .filter(
+            Customer.customer_id == user_id
+        )
         .first()
     )
 
@@ -94,18 +84,28 @@ def get_my_profile(
         )
 
     # --------------------------------------------------------
+    # ACCOUNT
+    # --------------------------------------------------------
+
+    account = (
+        db.query(Account)
+        .filter(
+            Account.customer_id
+            == customer.customer_id
+        )
+        .first()
+    )
+
+    # --------------------------------------------------------
     # LOCKER
     # --------------------------------------------------------
 
     locker = (
         db.query(Locker)
-<<<<<<< HEAD
-        .filter(Locker.customer_id == customer.customer_id)
-=======
         .filter(
-            Locker.customer_id == customer.customer_id
+            Locker.customer_id
+            == customer.customer_id
         )
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         .first()
     )
 
@@ -132,6 +132,7 @@ def get_my_profile(
     branch = None
 
     if locker:
+
         branch = getattr(
             locker,
             "branch_name",
@@ -139,6 +140,7 @@ def get_my_profile(
         )
 
         if not branch:
+
             branch = getattr(
                 locker,
                 "branch_code",
@@ -150,156 +152,14 @@ def get_my_profile(
     # --------------------------------------------------------
 
     return {
-<<<<<<< HEAD
-=======
-        # Customer
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
-        "customer_db_id": customer.customer_id,
-        "customer_id": customer.customer_number,
-        "customer_number": customer.customer_number,
-        "full_name": customer.full_name,
-        "email": customer.email,
-        "phone": customer.phone,
-        "account_status": customer.status,
-
-<<<<<<< HEAD
-        "locker_id": (
-            locker.locker_id
-            if locker else None
-        ),
-
-        "locker_number": (
-            locker.locker_number
-            if locker else None
-        ),
-
-        "locker_status": (
-            locker.status
-            if locker else None
-        ),
-
-        "branch": (
-            locker.branch_name
-            if locker else None
-        ),
-
-        "verification_status": "NOT_STARTED",
-    }
-
-
-# =====================================
-# GET CUSTOMER BY CUSTOMER NUMBER / ID
-# =====================================
-
-@router.get("/{customer_identifier}")
-def get_customer(
-    customer_identifier: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-
-    # Search using customer number
-    customer = (
-        db.query(Customer)
-        .filter(
-            Customer.customer_number
-            == customer_identifier.upper()
-        )
-        .first()
-    )
-
-    # If customer is not found,
-    # try numeric customer ID
-    if (
-        not customer
-        and customer_identifier.isdigit()
-    ):
-
-        customer = (
-            db.query(Customer)
-            .filter(
-                Customer.customer_id
-                == int(customer_identifier)
-            )
-            .first()
-        )
-
-    if not customer:
-
-        raise HTTPException(
-            status_code=404,
-            detail="Customer not found",
-        )
-
-    # =====================================
-    # ACCOUNT
-    # =====================================
-
-    account = (
-        db.query(Account)
-        .filter(
-            Account.customer_id
-            == customer.customer_id
-        )
-        .first()
-    )
-
-    # =====================================
-    # LOCKER
-    # =====================================
-
-    locker = (
-        db.query(Locker)
-        .filter(
-            Locker.customer_id
-            == customer.customer_id
-        )
-        .first()
-    )
-
-    # =====================================
-    # LATEST VERIFICATION
-    # =====================================
-
-    latest_verification = (
-        db.query(VerificationSession)
-        .filter(
-            VerificationSession.customer_id
-            == customer.customer_id
-        )
-        .order_by(
-            desc(
-                VerificationSession.started_at
-            )
-        )
-        .first()
-    )
-
-    # =====================================
-    # PREVIOUS OPERATIONS
-    # =====================================
-
-    operation_count = (
-        db.query(
-            func.count(
-                LockerOperation.operation_id
-            )
-        )
-        .filter(
-            LockerOperation.customer_id
-            == customer.customer_id
-        )
-        .scalar()
-    )
-
-    # =====================================
-    # COMPLETE CUSTOMER RESPONSE
-    # =====================================
-
-    return {
 
         # Customer
-        "customer_id": customer.customer_id,
+
+        "customer_db_id":
+            customer.customer_id,
+
+        "customer_id":
+            customer.customer_number,
 
         "customer_number":
             customer.customer_number,
@@ -307,92 +167,100 @@ def get_customer(
         "full_name":
             customer.full_name,
 
-        "phone":
-            customer.phone,
-
         "email":
             customer.email,
+
+        "phone":
+            customer.phone,
 
         "customer_status":
             customer.status,
 
+        "account_status":
+            (
+                account.status
+                if account
+                else customer.status
+            ),
+
 
         # Account
-        "account_id": (
-            account.account_id
-            if account else None
-        ),
 
-        "account_number": (
-            account.account_number
-            if account else None
-        ),
+        "account_id":
+            (
+                account.account_id
+                if account
+                else None
+            ),
 
-        "account_type": (
-            account.account_type
-            if account else None
-        ),
+        "account_number":
+            (
+                account.account_number
+                if account
+                else None
+            ),
 
-        "account_status": (
-            account.status
-            if account else None
-=======
-        # Account
-        "account_number": getattr(
-            customer,
-            "account_number",
-            None,
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
-        ),
+        "account_type":
+            (
+                account.account_type
+                if account
+                else None
+            ),
 
 
         # Locker
-        "locker_id": (
-            locker.locker_id
-            if locker
-            else None
-        ),
 
-        "locker_number": (
-            locker.locker_number
-            if locker
-            else None
-        ),
+        "locker_id":
+            (
+                locker.locker_id
+                if locker
+                else None
+            ),
 
-        "locker_status": (
-            locker.status
-<<<<<<< HEAD
-            if locker else None
-        ),
+        "locker_number":
+            (
+                locker.locker_number
+                if locker
+                else None
+            ),
 
-        "branch_name": (
-            locker.branch_name
-            if locker else None
-=======
-            if locker
-            else None
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
-        ),
-        "branch": branch,
+        "locker_status":
+            (
+                locker.status
+                if locker
+                else None
+            ),
+
+        "branch":
+            branch,
+
+        "branch_name":
+            branch,
 
 
         # Verification
-        "verification_id": (
-            str(latest_verification.session_id)
-            if latest_verification
-            else None
-        ),
-        "verification_status": (
-            latest_verification.status
-            if latest_verification
-            else "NOT_STARTED"
-        ),
+
+        "verification_id":
+            (
+                str(
+                    latest_verification.session_id
+                )
+                if latest_verification
+                else None
+            ),
+
+        "verification_status":
+            (
+                latest_verification.status
+                if latest_verification
+                else "NOT_STARTED"
+            ),
     }
 
 
 # ============================================================
 # CUSTOMER SEARCH
-# Used by Officer Dashboard
+# Used by Officer Dashboard / Officer Verification
 # ============================================================
 
 @router.get("/{customer_identifier}")
@@ -401,17 +269,12 @@ def get_customer(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+
     # --------------------------------------------------------
     # SEARCH BY CUSTOMER NUMBER
     # Example: CUST000012
     # --------------------------------------------------------
 
-<<<<<<< HEAD
-
-        # Operation History
-        "previous_operations":
-            operation_count,
-=======
     customer = (
         db.query(Customer)
         .filter(
@@ -421,8 +284,9 @@ def get_customer(
         .first()
     )
 
+
     # --------------------------------------------------------
-    # SEARCH BY NUMERIC CUSTOMER DB ID
+    # SEARCH BY NUMERIC CUSTOMER DATABASE ID
     # Example: 12
     # --------------------------------------------------------
 
@@ -430,6 +294,7 @@ def get_customer(
         not customer
         and customer_identifier.isdigit()
     ):
+
         customer = (
             db.query(Customer)
             .filter(
@@ -439,15 +304,18 @@ def get_customer(
             .first()
         )
 
+
     # --------------------------------------------------------
-    # NOT FOUND
+    # CUSTOMER NOT FOUND
     # --------------------------------------------------------
 
     if not customer:
+
         raise HTTPException(
             status_code=404,
             detail="Customer not found",
         )
+
 
     # --------------------------------------------------------
     # ACCOUNT
@@ -462,6 +330,7 @@ def get_customer(
         .first()
     )
 
+
     # --------------------------------------------------------
     # LOCKER
     # --------------------------------------------------------
@@ -474,6 +343,7 @@ def get_customer(
         )
         .first()
     )
+
 
     # --------------------------------------------------------
     # LATEST VERIFICATION
@@ -490,6 +360,7 @@ def get_customer(
         )
         .first()
     )
+
 
     # --------------------------------------------------------
     # PREVIOUS LOCKER OPERATIONS
@@ -508,6 +379,7 @@ def get_customer(
         .scalar()
     )
 
+
     # --------------------------------------------------------
     # BRANCH
     # --------------------------------------------------------
@@ -515,6 +387,7 @@ def get_customer(
     branch = None
 
     if locker:
+
         branch = getattr(
             locker,
             "branch_name",
@@ -522,109 +395,136 @@ def get_customer(
         )
 
         if not branch:
+
             branch = getattr(
                 locker,
                 "branch_code",
                 None,
             )
 
+
     # --------------------------------------------------------
     # RETURN COMPLETE CUSTOMER INFORMATION
     # --------------------------------------------------------
 
     return {
-        # ----------------------------------------------------
-        # Customer
-        # ----------------------------------------------------
-
-        "customer_db_id": customer.customer_id,
-
-        "customer_id": customer.customer_id,
-
-        "customer_number": customer.customer_number,
-
-        "full_name": customer.full_name,
-
-        "phone": customer.phone,
-
-        "email": customer.email,
-
-        "customer_status": customer.status,
 
         # ----------------------------------------------------
-        # Account
+        # CUSTOMER
         # ----------------------------------------------------
 
-        "account_id": (
-            account.account_id
-            if account
-            else None
-        ),
+        "customer_db_id":
+            customer.customer_id,
 
-        "account_number": (
-            account.account_number
-            if account
-            else None
-        ),
+        "customer_id":
+            customer.customer_id,
 
-        "account_type": (
-            account.account_type
-            if account
-            else None
-        ),
+        "customer_number":
+            customer.customer_number,
 
-        "account_status": (
-            account.status
-            if account
-            else customer.status
-        ),
+        "full_name":
+            customer.full_name,
+
+        "phone":
+            customer.phone,
+
+        "email":
+            customer.email,
+
+        "customer_status":
+            customer.status,
+
 
         # ----------------------------------------------------
-        # Locker
+        # ACCOUNT
         # ----------------------------------------------------
 
-        "locker_id": (
-            locker.locker_id
-            if locker
-            else None
-        ),
+        "account_id":
+            (
+                account.account_id
+                if account
+                else None
+            ),
 
-        "locker_number": (
-            locker.locker_number
-            if locker
-            else None
-        ),
+        "account_number":
+            (
+                account.account_number
+                if account
+                else None
+            ),
 
-        "locker_status": (
-            locker.status
-            if locker
-            else None
-        ),
+        "account_type":
+            (
+                account.account_type
+                if account
+                else None
+            ),
 
-        "branch": branch,
+        "account_status":
+            (
+                account.status
+                if account
+                else customer.status
+            ),
 
-        "branch_name": branch,
-
-        # ----------------------------------------------------
-        # Verification
-        # ----------------------------------------------------
-
-        "verification_id": (
-            str(latest_verification.session_id)
-            if latest_verification
-            else None
-        ),
-
-        "verification_status": (
-            latest_verification.status
-            if latest_verification
-            else "NOT_STARTED"
-        ),
 
         # ----------------------------------------------------
-        # Operation History
+        # LOCKER
         # ----------------------------------------------------
 
-        "previous_operations": operation_count,
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
+        "locker_id":
+            (
+                locker.locker_id
+                if locker
+                else None
+            ),
+
+        "locker_number":
+            (
+                locker.locker_number
+                if locker
+                else None
+            ),
+
+        "locker_status":
+            (
+                locker.status
+                if locker
+                else None
+            ),
+
+        "branch":
+            branch,
+
+        "branch_name":
+            branch,
+
+
+        # ----------------------------------------------------
+        # VERIFICATION
+        # ----------------------------------------------------
+
+        "verification_id":
+            (
+                str(
+                    latest_verification.session_id
+                )
+                if latest_verification
+                else None
+            ),
+
+        "verification_status":
+            (
+                latest_verification.status
+                if latest_verification
+                else "NOT_STARTED"
+            ),
+
+
+        # ----------------------------------------------------
+        # OPERATION HISTORY
+        # ----------------------------------------------------
+
+        "previous_operations":
+            operation_count,
     }

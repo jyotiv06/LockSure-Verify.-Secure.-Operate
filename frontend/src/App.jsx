@@ -1,4 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 // Home / Portal Selection
 import PortalSelection from "./pages/PortalSelection";
@@ -22,9 +27,13 @@ import LockerOperation from "./pages/officer/LockerOperation";
 import SecurityAlerts from "./pages/officer/SecurityAlerts";
 import AuditHistory from "./pages/officer/AuditHistory";
 
+
 function App() {
+
   return (
+
     <BrowserRouter>
+
       <Routes>
 
         {/* ========================= */}
@@ -36,12 +45,9 @@ function App() {
           element={<PortalSelection />}
         />
 
+
         {/* ========================= */}
-<<<<<<< HEAD
         {/* CUSTOMER AUTHENTICATION */}
-=======
-        {/* CUSTOMER AUTHENTICATION   */}
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -54,35 +60,17 @@ function App() {
           element={<Register />}
         />
 
-        {/* Optional customer login route */}
         <Route
           path="/customer/login"
           element={<Login />}
         />
 
-<<<<<<< HEAD
+
         {/* ========================= */}
         {/* CUSTOMER PORTAL */}
         {/* ========================= */}
 
         <Route
-=======
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="/register"
-          element={<Register />}
-        />
-
-        {/* ========================= */}
-        {/* CUSTOMER PORTAL            */}
-        {/* ========================= */}
-
-        <Route
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
           path="/dashboard"
           element={<Dashboard />}
         />
@@ -92,12 +80,9 @@ function App() {
           element={<Profile />}
         />
 
+
         {/* ========================= */}
-<<<<<<< HEAD
         {/* CUSTOMER VERIFICATION */}
-=======
-        {/* VERIFICATION FLOW          */}
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -120,12 +105,9 @@ function App() {
           element={<LockerStatus />}
         />
 
+
         {/* ========================= */}
-<<<<<<< HEAD
         {/* OFFICER PORTAL */}
-=======
-        {/* OFFICER PORTAL             */}
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -173,12 +155,9 @@ function App() {
           element={<AuditHistory />}
         />
 
+
         {/* ========================= */}
-<<<<<<< HEAD
         {/* UNKNOWN ROUTES */}
-=======
-        {/* UNKNOWN ROUTES             */}
->>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -192,8 +171,12 @@ function App() {
         />
 
       </Routes>
+
     </BrowserRouter>
+
   );
+
 }
+
 
 export default App;
