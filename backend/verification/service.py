@@ -372,7 +372,6 @@ def process_document(
             )
 
         # -------------------------------
-        # -------------------------------
         # FIND OR CREATE CUSTOMER DOCUMENT
         # -------------------------------
 
@@ -593,6 +592,10 @@ def finalize_verification(verification_id: str):
 
         if not session:
             return None
+<<<<<<< HEAD
+=======
+
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         # --------------------------------------------------------
         # GET ACTUAL VERIFICATION RESULTS
         # --------------------------------------------------------
@@ -647,7 +650,10 @@ def finalize_verification(verification_id: str):
             face_result == "PASSED"
         )
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         # --------------------------------------------------------
         # VALIDATE ACTUAL RESULTS
         # --------------------------------------------------------
@@ -859,7 +865,10 @@ def finalize_verification(verification_id: str):
 
         db.add(risk)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         # --------------------------------------------------------
         # UPDATE SESSION
         # --------------------------------------------------------
@@ -915,6 +924,11 @@ def finalize_verification(verification_id: str):
                     "Locker operation blocked.",
                 )
 
+<<<<<<< HEAD
+=======
+        return get_verification(verification_id)
+
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
 
         return {
             "verification_id": str(

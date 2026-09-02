@@ -79,7 +79,6 @@ def get_session(verification_id: str):
     )
 
     if not session:
-
         raise HTTPException(
             status_code=404,
             detail="Verification not found",
@@ -106,7 +105,6 @@ def document_result(
     )
 
     if not session:
-
         raise HTTPException(
             status_code=404,
             detail="Verification not found or document not found",
@@ -133,7 +131,6 @@ def face_result(
     )
 
     if not session:
-
         raise HTTPException(
             status_code=404,
             detail="Verification not found",
@@ -154,7 +151,6 @@ def finalize(verification_id: str):
     )
 
     if not session:
-
         raise HTTPException(
             status_code=404,
             detail="Verification not found",

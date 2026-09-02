@@ -37,7 +37,11 @@ function App() {
         />
 
         {/* ========================= */}
+<<<<<<< HEAD
         {/* CUSTOMER AUTHENTICATION */}
+=======
+        {/* CUSTOMER AUTHENTICATION   */}
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -56,11 +60,29 @@ function App() {
           element={<Login />}
         />
 
+<<<<<<< HEAD
         {/* ========================= */}
         {/* CUSTOMER PORTAL */}
         {/* ========================= */}
 
         <Route
+=======
+        <Route
+          path="/login"
+          element={<Login />}
+        />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+
+        {/* ========================= */}
+        {/* CUSTOMER PORTAL            */}
+        {/* ========================= */}
+
+        <Route
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
           path="/dashboard"
           element={<Dashboard />}
         />
@@ -71,7 +93,11 @@ function App() {
         />
 
         {/* ========================= */}
+<<<<<<< HEAD
         {/* CUSTOMER VERIFICATION */}
+=======
+        {/* VERIFICATION FLOW          */}
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -95,7 +121,11 @@ function App() {
         />
 
         {/* ========================= */}
+<<<<<<< HEAD
         {/* OFFICER PORTAL */}
+=======
+        {/* OFFICER PORTAL             */}
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
@@ -144,7 +174,11 @@ function App() {
         />
 
         {/* ========================= */}
+<<<<<<< HEAD
         {/* UNKNOWN ROUTES */}
+=======
+        {/* UNKNOWN ROUTES             */}
+>>>>>>> 00feda13bc4bdedbdb0187fd2279060c751501b4
         {/* ========================= */}
 
         <Route
