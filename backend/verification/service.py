@@ -352,6 +352,7 @@ def process_document(
                 else None
             ),
             "id_number": customer.customer_number,
+            "customer_number": customer.customer_number,
             "address": customer.address,
             "email": customer.email,
             "phone": customer.phone,
@@ -369,6 +370,9 @@ def process_document(
 
         if not data.get("name") and data.get("full_name"):
             data["name"] = data["full_name"]
+
+        if not data.get("customer_number") and data.get("id_number"):
+            data["customer_number"] = data["id_number"]
 
         if not data.get("id_number") and data.get("customer_number"):
             data["id_number"] = data["customer_number"]
@@ -443,11 +447,17 @@ def process_document(
                 customer_id=session.customer_id,
                 document_type="IDENTITY_DOCUMENT",
                 document_number=f"VERIFICATION-{session.session_id}",
-                document_reference=image_path,
+                document_reference=str(Path(image_path).resolve()),
                 verified=False,
             )
             db.add(document)
             db.flush()
+        else:
+            # Always bind the customer document to the image uploaded for
+            # THIS verification. This prevents old/deleted demo paths from
+            # breaking the later face-verification step.
+            document.document_reference = str(Path(image_path).resolve())
+            document.verified = False
 
         # -------------------------------
         # SAVE DOCUMENT VERIFICATION
@@ -460,6 +470,7 @@ def process_document(
                 "name": data.get("name"),
                 "dob": data.get("dob"),
                 "id_number": data.get("id_number"),
+                "customer_number": data.get("customer_number"),
                 "address": data.get("address"),
             })
 
@@ -589,13 +600,48 @@ def process_face(
                     .first()
                 )
 
-                if not document or not document.document_reference:
+                if not document:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Reference document not found.",
+                    )
+
+                # Prefer the exact document uploaded for THIS verification.
+                # This is independent of stale/empty paths in older DB rows.
+                upload_dir = (
+                    Path("uploads")
+                    / "verification"
+                    / str(session.session_id)
+                )
+
+                candidates = sorted(
+                    upload_dir.glob("document_*"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+
+                document_path = None
+
+                if candidates:
+                    document_path = str(candidates[0].resolve())
+                    document.document_reference = document_path
+                    db.commit()
+
+                # Fall back to the DB reference if the upload directory is
+                # unavailable (for example after an application restart).
+                if not document_path and document.document_reference:
+                    document_path_obj = Path(document.document_reference)
+                    if not document_path_obj.is_absolute():
+                        document_path_obj = (
+                            Path.cwd() / document_path_obj
+                        ).resolve()
+                    document_path = str(document_path_obj)
+
+                if not document_path:
                     raise HTTPException(
                         status_code=400,
                         detail="Reference document image is unavailable.",
                     )
-
-                document_path = document.document_reference
 
                 if not Path(document_path).exists():
                     raise HTTPException(
@@ -606,21 +652,9 @@ def process_face(
                         ),
                     )
 
-                # Use the original verified document image as the DeepFace
-                # reference. DeepFace performs its own face detection, so
-                # there is no need to crop the document photo beforehand.
-                # This avoids the PaddleOCR pipeline being initialized during
-                # face verification and preserves the full document image.
+                # DeepFace performs face detection on the complete verified
+                # document image. No fake face_match is used.
                 reference_image = document_path
-
-            if not Path(reference_image).exists():
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Reference face image does not exist: "
-                        f"{reference_image}"
-                    ),
-                )
 
             try:
                 result = verify_face_real(

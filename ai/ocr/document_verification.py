@@ -74,6 +74,7 @@ def extract_fields(ocr_texts):
         "name": None,
         "dob": None,
         "id_number": None,
+        "customer_number": None,
         "address": None
     }
 
@@ -90,6 +91,7 @@ def extract_fields(ocr_texts):
         ("name", re.compile(r"^(?:full\s*name|name)\s*[:\-]?\s*(.+)$", re.I)),
         ("dob", re.compile(r"^(?:date\s*of\s*birth|dob)\s*[:\-]?\s*(.+)$", re.I)),
         ("id_number", re.compile(r"^(?:id\s*number|id\s*no|id)\s*[:\-]?\s*(.+)$", re.I)),
+        ("customer_number", re.compile(r"^customer\s*(?:number|no)\s*[:\-]?\s*(.+)$", re.I)),
         ("address", re.compile(r"^address\s*[:\-]?\s*(.+)$", re.I)),
     ]
 
@@ -97,6 +99,7 @@ def extract_fields(ocr_texts):
         ("name", re.compile(r"^(?:full\s*name|name)\s*[:\-]?\s*$", re.I)),
         ("dob", re.compile(r"^(?:date\s*of\s*birth|dob)\s*[:\-]?\s*$", re.I)),
         ("id_number", re.compile(r"^(?:id\s*number|id\s*no|id)\s*[:\-]?\s*$", re.I)),
+        ("customer_number", re.compile(r"^customer\s*(?:number|no)\s*[:\-]?\s*$", re.I)),
         ("address", re.compile(r"^address\s*[:\-]?\s*$", re.I)),
     ]
 
@@ -149,7 +152,12 @@ def _normalize_dob(value):
 
 
 def compare_fields(extracted_data, customer_data):
+    """Compare OCR data with the registered customer.
 
+    The current Customer schema has customer_number but no separate
+    id_number column. Therefore the document's ID Number is informational,
+    while Customer Number is the registered identity used for matching.
+    """
     name_match = (
         bool(extracted_data.get("name"))
         and bool(customer_data.get("name"))
@@ -157,12 +165,15 @@ def compare_fields(extracted_data, customer_data):
         == normalize_text(customer_data.get("name"))
     )
 
-    id_match = (
-        bool(extracted_data.get("id_number"))
-        and bool(customer_data.get("id_number"))
-        and normalize_text(extracted_data.get("id_number"))
-        == normalize_text(customer_data.get("id_number"))
+    customer_number_match = (
+        bool(extracted_data.get("customer_number"))
+        and bool(customer_data.get("customer_number"))
+        and normalize_text(extracted_data.get("customer_number"))
+        == normalize_text(customer_data.get("customer_number"))
     )
+
+    # Keep id_match for frontend/backward compatibility.
+    id_match = customer_number_match
 
     dob_match = (
         bool(extracted_data.get("dob"))
@@ -178,10 +189,7 @@ def compare_fields(extracted_data, customer_data):
         == normalize_text(customer_data.get("address"))
     )
 
-    # The Customer schema allows date_of_birth and address to be NULL.
-    # Therefore they cannot be treated as mandatory when the database has
-    # no value to compare against. Name and customer_number remain mandatory.
-    required_matches = [name_match, id_match]
+    required_matches = [name_match, customer_number_match]
 
     if customer_data.get("dob") not in (None, ""):
         required_matches.append(dob_match)
@@ -195,13 +203,15 @@ def compare_fields(extracted_data, customer_data):
         "verified": verified,
         "name_match": name_match,
         "id_match": id_match,
+        "customer_number_match": customer_number_match,
         "dob_match": dob_match,
         "address_match": address_match,
         "verification_policy": {
             "name_required": True,
-            "id_number_required": True,
+            "customer_number_required": True,
+            "id_number_required": False,
             "dob_required": bool(customer_data.get("dob")),
-            "address_required": bool(customer_data.get("address"))
+            "address_required": bool(customer_data.get("address")),
         }
     }
 
@@ -496,6 +506,7 @@ def verify_document(image, customer_data):
                 "verified": False,
                 "name_match": False,
                 "id_match": False,
+                "customer_number_match": False,
                 "dob_match": False,
                 "address_match": False,
                 "document_photo_path": None,
@@ -510,6 +521,7 @@ def verify_document(image, customer_data):
                 "verified": False,
                 "name_match": False,
                 "id_match": False,
+                "customer_number_match": False,
                 "dob_match": False,
                 "address_match": False,
                 "document_photo_path": None,
@@ -533,6 +545,7 @@ def verify_document(image, customer_data):
                 "verified": False,
                 "name_match": False,
                 "id_match": False,
+                "customer_number_match": False,
                 "dob_match": False,
                 "address_match": False,
                 "document_photo_path": None,
@@ -621,6 +634,7 @@ def verify_document(image, customer_data):
                 "verified": False,
                 "name_match": False,
                 "id_match": False,
+                "customer_number_match": False,
                 "dob_match": False,
                 "address_match": False,
                 "document_photo_path": document_photo_path,
@@ -673,6 +687,9 @@ def verify_document(image, customer_data):
 
             "id_match":
                 comparison["id_match"],
+
+            "customer_number_match":
+                comparison["customer_number_match"],
 
             "dob_match":
                 comparison["dob_match"],
