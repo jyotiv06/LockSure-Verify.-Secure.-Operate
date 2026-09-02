@@ -34,7 +34,9 @@ function CustomerSearch() {
     if (!searchValue) {
       setCustomer(null);
       setSearched(true);
-      setErrorMessage("Please enter a Customer ID or Customer Number.");
+      setErrorMessage(
+        "Please enter a Customer ID or Customer Number."
+      );
       return;
     }
 
@@ -48,10 +50,18 @@ function CustomerSearch() {
         `/customers/${encodeURIComponent(searchValue)}`
       );
 
+      console.log(
+        "CUSTOMER SEARCH RESPONSE:",
+        response.data
+      );
+
       setCustomer(response.data);
       setSearched(true);
     } catch (error) {
-      console.error("Customer search error:", error);
+      console.error(
+        "Customer search error:",
+        error
+      );
 
       setCustomer(null);
       setSearched(true);
@@ -76,15 +86,29 @@ function CustomerSearch() {
   };
 
   const getVerificationStyles = (status) => {
-    if (status === "COMPLETED" || status === "VERIFIED") {
+    const normalizedStatus = String(
+      status || ""
+    ).toUpperCase();
+
+    if (
+      normalizedStatus === "APPROVED" ||
+      normalizedStatus === "COMPLETED" ||
+      normalizedStatus === "VERIFIED"
+    ) {
       return "bg-emerald-50 text-emerald-700";
     }
 
-    if (status === "FAILED") {
+    if (
+      normalizedStatus === "FAILED" ||
+      normalizedStatus === "REJECTED"
+    ) {
       return "bg-red-50 text-red-700";
     }
 
-    if (status === "IN_PROGRESS") {
+    if (
+      normalizedStatus === "IN_PROGRESS" ||
+      normalizedStatus === "PENDING"
+    ) {
       return "bg-yellow-50 text-yellow-700";
     }
 
@@ -105,6 +129,42 @@ function CustomerSearch() {
       customer?.customer_number ||
       customer?.customer_id ||
       "N/A"
+    );
+  };
+
+  const handleBeginVerification = () => {
+    /*
+      Backend returns:
+
+      customer_db_id  -> numeric database ID
+      customer_id     -> currently numeric customer ID
+      customer_number -> customer number such as CUST001
+
+      Verification API expects numeric customer_id,
+      so customer_db_id is the safest value.
+    */
+
+    const verificationCustomerId =
+      customer?.customer_db_id ||
+      customer?.customer_id;
+
+    if (!verificationCustomerId) {
+      console.error(
+        "Customer database ID is missing from API response.",
+        customer
+      );
+
+      setErrorMessage(
+        "Customer ID is missing. Unable to begin verification."
+      );
+
+      return;
+    }
+
+    navigate(
+      `/officer/customer-verification?customer=${encodeURIComponent(
+        verificationCustomerId
+      )}`
     );
   };
 
@@ -158,7 +218,10 @@ function CustomerSearch() {
 
             <input
               value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
+              onChange={(e) => {
+                setCustomerId(e.target.value);
+                setErrorMessage("");
+              }}
               placeholder="Enter Customer ID e.g. CUST001 or 1001"
               className="w-full rounded-xl border border-[#CBD5E1] py-3 pl-10 pr-4 text-sm outline-none transition focus:border-[#2563EB] focus:ring-4 focus:ring-blue-50"
             />
@@ -175,13 +238,11 @@ function CustomerSearch() {
                   size={17}
                   className="animate-spin"
                 />
-
                 Searching...
               </>
             ) : (
               <>
                 <Search size={17} />
-
                 Search
               </>
             )}
@@ -216,6 +277,7 @@ function CustomerSearch() {
       {/* Customer Result */}
       {customer && (
         <div className="mt-6 rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
+
           {/* Customer Header */}
           <div className="flex flex-col justify-between gap-4 border-b border-[#E2E8F0] px-6 py-5 sm:flex-row sm:items-center">
             <div>
@@ -239,12 +301,14 @@ function CustomerSearch() {
             >
               <CheckCircle2 size={14} />
 
-              {customer.verification_status || "NOT VERIFIED"}
+              {customer.verification_status ||
+                "NOT_STARTED"}
             </div>
           </div>
 
           {/* Customer Information */}
           <div className="grid gap-6 p-6 sm:grid-cols-2 lg:grid-cols-3">
+
             <InfoItem
               icon={UserRound}
               label="Customer ID"
@@ -305,7 +369,7 @@ function CustomerSearch() {
               label="Verification"
               value={
                 customer.verification_status ||
-                "NOT VERIFIED"
+                "NOT_STARTED"
               }
             />
 
@@ -318,26 +382,14 @@ function CustomerSearch() {
                 "N/A"
               }
             />
+
           </div>
 
           {/* Action */}
           <div className="flex justify-end border-t border-[#E2E8F0] bg-[#F8FAFC] px-6 py-4">
             <button
               type="button"
-              onClick={() => {
-                if (!customer.customer_id) {
-                  console.error(
-                    "Customer ID is missing from API response."
-                  );
-                  return;
-                }
-
-                navigate(
-                  `/officer/customer-verification?customer=${encodeURIComponent(
-                    customer.customer_id
-                  )}`
-                );
-              }}
+              onClick={handleBeginVerification}
               className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8]"
             >
               Begin Verification
@@ -345,11 +397,13 @@ function CustomerSearch() {
               <ArrowRight size={16} />
             </button>
           </div>
+
         </div>
       )}
     </OfficerLayout>
   );
 }
+
 
 function InfoItem({
   icon: Icon,
@@ -374,5 +428,6 @@ function InfoItem({
     </div>
   );
 }
+
 
 export default CustomerSearch;

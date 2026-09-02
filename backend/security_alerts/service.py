@@ -6,34 +6,19 @@ from models.customer import Customer
 from models.locker import Locker
 
 
+# ============================================================
+# GET ACTIVE SECURITY ALERTS
+# ============================================================
+
 def get_security_alerts():
 
     db = SessionLocal()
 
     try:
 
-        results = (
-            db.query(
-                RiskAssessment,
-                VerificationSession,
-                Customer,
-                Locker,
-            )
-            .join(
-                VerificationSession,
-                RiskAssessment.session_id
-                == VerificationSession.session_id,
-            )
-            .join(
-                Customer,
-                VerificationSession.customer_id
-                == Customer.customer_id,
-            )
-            .outerjoin(
-                Locker,
-                VerificationSession.locker_id
-                == Locker.locker_id,
-            )
+        # Get only active risk alerts
+        risks = (
+            db.query(RiskAssessment)
             .filter(
                 RiskAssessment.risk_level.in_(
                     ["HIGH", "MEDIUM"]
@@ -47,51 +32,184 @@ def get_security_alerts():
 
         alerts = []
 
-        for risk, session, customer, locker in results:
+        for risk in risks:
 
-            if risk.risk_level == "HIGH":
-                recommended_action = "BLOCK"
+            # Get verification session
+            session = (
+                db.query(VerificationSession)
+                .filter(
+                    VerificationSession.session_id
+                    == risk.session_id
+                )
+                .first()
+            )
 
-            else:
-                recommended_action = "REVIEW"
+            # Skip broken/deleted sessions safely
+            if not session:
+                continue
 
-            alert = {
-                "alert_id": f"ALT-{risk.risk_id}",
+            # Get customer
+            customer = (
+                db.query(Customer)
+                .filter(
+                    Customer.customer_id
+                    == session.customer_id
+                )
+                .first()
+            )
 
-                "customer_id": customer.customer_id,
+            # Get locker
+            locker = (
+                db.query(Locker)
+                .filter(
+                    Locker.locker_id
+                    == session.locker_id
+                )
+                .first()
+            )
 
-                "customer_name": customer.full_name,
+            alerts.append({
 
-                "locker_id": (
+                "risk_id": int(risk.risk_id),
+
+                "alert_id":
+                    f"ALT-{risk.risk_id}",
+
+                "customer_id":
+                    session.customer_id,
+
+                "customer_name":
+                    customer.full_name
+                    if customer
+                    else f"Customer #{session.customer_id}",
+
+                "locker_id":
                     locker.locker_id
-                    if locker else None
-                ),
+                    if locker
+                    else session.locker_id,
 
-                "locker_number": (
+                "locker_number":
                     locker.locker_number
-                    if locker else None
-                ),
+                    if locker
+                    else None,
 
-                "incident_reason": (
+                "incident_reason":
                     risk.reason
-                    or "Suspicious verification activity detected"
-                ),
+                    or "Suspicious verification activity detected",
 
-                "severity": risk.risk_level,
+                "severity":
+                    str(risk.risk_level).upper(),
 
-                "recommended_action": recommended_action,
+                "recommended_action":
+                    (
+                        "BLOCK"
+                        if str(risk.risk_level).upper() == "HIGH"
+                        else "REVIEW"
+                    ),
 
-                "timestamp": (
+                "timestamp":
                     risk.created_at.isoformat()
-                    if risk.created_at else None
-                ),
+                    if risk.created_at
+                    else None,
 
-                "verification_id": session.session_id,
-            }
+                "verification_id":
+                    str(session.session_id),
 
-            alerts.append(alert)
+            })
 
         return alerts
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# RESOLVE SECURITY ALERT
+# ============================================================
+
+def resolve_security_alert(risk_id: int):
+
+    db = SessionLocal()
+
+    try:
+
+        risk = (
+            db.query(RiskAssessment)
+            .filter(
+                RiskAssessment.risk_id == risk_id
+            )
+            .first()
+        )
+
+        if not risk:
+            return None
+
+        risk.risk_level = "RESOLVED"
+
+        db.commit()
+
+        return {
+            "message":
+                "Security alert resolved successfully",
+
+            "risk_id":
+                risk_id,
+
+            "status":
+                "RESOLVED",
+        }
+
+    except Exception:
+
+        db.rollback()
+        raise
+
+    finally:
+
+        db.close()
+
+
+# ============================================================
+# DISMISS SECURITY ALERT
+# ============================================================
+
+def dismiss_security_alert(risk_id: int):
+
+    db = SessionLocal()
+
+    try:
+
+        risk = (
+            db.query(RiskAssessment)
+            .filter(
+                RiskAssessment.risk_id == risk_id
+            )
+            .first()
+        )
+
+        if not risk:
+            return None
+
+        risk.risk_level = "DISMISSED"
+
+        db.commit()
+
+        return {
+            "message":
+                "Security alert dismissed successfully",
+
+            "risk_id":
+                risk_id,
+
+            "status":
+                "DISMISSED",
+        }
+
+    except Exception:
+
+        db.rollback()
+        raise
 
     finally:
 

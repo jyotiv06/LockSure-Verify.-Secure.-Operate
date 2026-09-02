@@ -7,6 +7,7 @@ import {
   ScanFace,
   CircleCheck,
   CircleX,
+  Loader2,
 } from "lucide-react";
 
 import {
@@ -81,7 +82,7 @@ function CustomerVerification() {
 
 
   /*
-    Loading state
+    Page loading
   */
   const [
     loading,
@@ -90,12 +91,19 @@ function CustomerVerification() {
 
 
   /*
-    Action loading
+    Current action loading
+
+    Values:
+    document-pass
+    document-fail
+    face-pass
+    face-fail
+    finalize
   */
   const [
     actionLoading,
     setActionLoading,
-  ] = useState(false);
+  ] = useState(null);
 
 
   /*
@@ -109,7 +117,227 @@ function CustomerVerification() {
 
   /*
     =================================
-    FETCH VERIFICATION SESSION
+    NORMALIZE BOOLEAN VALUES
+    =================================
+
+    Backend may return:
+
+    true
+    false
+
+    OR
+
+    VERIFIED
+    FAILED
+    PASSED
+    REJECTED
+  */
+  const normalizeBoolean =
+    (value) => {
+
+      if (
+        value === true ||
+        value === "true"
+      ) {
+        return true;
+      }
+
+
+      if (
+        value === false ||
+        value === "false"
+      ) {
+        return false;
+      }
+
+
+      if (
+        typeof value === "string"
+      ) {
+
+        const normalized =
+          value
+            .trim()
+            .toUpperCase();
+
+
+        if (
+          [
+            "VERIFIED",
+            "PASSED",
+            "SUCCESS",
+            "MATCHED",
+            "APPROVED",
+          ].includes(normalized)
+        ) {
+          return true;
+        }
+
+
+        if (
+          [
+            "FAILED",
+            "REJECTED",
+            "NOT_MATCHED",
+            "BLOCKED",
+          ].includes(normalized)
+        ) {
+          return false;
+        }
+
+      }
+
+
+      return null;
+
+    };
+
+
+  /*
+    =================================
+    GET DOCUMENT RESULT
+
+    Supports different possible
+    backend response structures.
+  */
+  const getDocumentMatch =
+    (data) => {
+
+      if (!data) {
+        return null;
+      }
+
+
+      const direct =
+        normalizeBoolean(
+          data.document_match
+        );
+
+
+      if (
+        direct !== null
+      ) {
+        return direct;
+      }
+
+
+      const result =
+        normalizeBoolean(
+          data.document_result
+        );
+
+
+      if (
+        result !== null
+      ) {
+        return result;
+      }
+
+
+      const nestedResult =
+        normalizeBoolean(
+          data.document_verification?.result
+        );
+
+
+      if (
+        nestedResult !== null
+      ) {
+        return nestedResult;
+      }
+
+
+      const nestedMatch =
+        normalizeBoolean(
+          data.document_verification?.document_match
+        );
+
+
+      if (
+        nestedMatch !== null
+      ) {
+        return nestedMatch;
+      }
+
+
+      return null;
+
+    };
+
+
+  /*
+    =================================
+    GET FACE RESULT
+    =================================
+  */
+  const getFaceMatch =
+    (data) => {
+
+      if (!data) {
+        return null;
+      }
+
+
+      const direct =
+        normalizeBoolean(
+          data.face_match
+        );
+
+
+      if (
+        direct !== null
+      ) {
+        return direct;
+      }
+
+
+      const result =
+        normalizeBoolean(
+          data.face_result
+        );
+
+
+      if (
+        result !== null
+      ) {
+        return result;
+      }
+
+
+      const nestedResult =
+        normalizeBoolean(
+          data.face_verification?.result
+        );
+
+
+      if (
+        nestedResult !== null
+      ) {
+        return nestedResult;
+      }
+
+
+      const nestedMatch =
+        normalizeBoolean(
+          data.face_verification?.face_match
+        );
+
+
+      if (
+        nestedMatch !== null
+      ) {
+        return nestedMatch;
+      }
+
+
+      return null;
+
+    };
+
+
+  /*
+    =================================
+    FETCH VERIFICATION
     =================================
   */
   const fetchVerification =
@@ -206,10 +434,8 @@ function CustomerVerification() {
 
 
           /*
-            =================================
             STEP 1:
             FETCH CUSTOMER
-            =================================
           */
           const customerResponse =
             await api.get(
@@ -235,25 +461,9 @@ function CustomerVerification() {
 
 
           /*
-            =================================
             STEP 2:
-            PREPARE BACKEND VALUES
-            =================================
-
-            IMPORTANT:
-
-            customer.customer_id
-            -> Database customer ID
-
-            customer.locker_number
-            -> Business locker number
-
-            Backend start_verification()
-            searches by:
-
-            Locker.locker_number == locker_id
+            PREPARE VALUES
           */
-
           const verificationCustomerId =
             customer.customer_id;
 
@@ -281,7 +491,7 @@ function CustomerVerification() {
 
 
           /*
-            VALIDATE CUSTOMER ID
+            VALIDATE CUSTOMER
           */
           if (
             verificationCustomerId === null ||
@@ -296,7 +506,7 @@ function CustomerVerification() {
 
 
           /*
-            VALIDATE LOCKER NUMBER
+            VALIDATE LOCKER
           */
           if (
             !verificationLockerNumber
@@ -310,29 +520,18 @@ function CustomerVerification() {
 
 
           /*
-            =================================
             STEP 3:
             START VERIFICATION
-            =================================
           */
           const response =
             await api.post(
               "/verification/start",
               {
-                /*
-                  Integer database ID
-                */
                 customer_id:
                   Number(
                     verificationCustomerId
                   ),
 
-                /*
-                  Backend expects business
-                  locker number such as:
-                  L001
-                  L032
-                */
                 locker_id:
                   String(
                     verificationLockerNumber
@@ -384,12 +583,7 @@ function CustomerVerification() {
 
 
           /*
-            Backend returns:
-
-            verification_id
-
-            Keep fallback support for
-            other possible response formats.
+            GET VERIFICATION ID
           */
           const id =
             response.data.verification_id ||
@@ -416,7 +610,7 @@ function CustomerVerification() {
 
 
           /*
-            SAVE SESSION DATA
+            SAVE SESSION
           */
           localStorage.setItem(
             "verificationId",
@@ -432,10 +626,6 @@ function CustomerVerification() {
           );
 
 
-          /*
-            Save business locker number,
-            not database locker ID
-          */
           localStorage.setItem(
             "verificationLockerId",
             String(
@@ -445,12 +635,7 @@ function CustomerVerification() {
 
 
           /*
-            Initially use POST response
-            immediately.
-
-            This prevents the UI from
-            becoming empty if GET response
-            structure differs.
+            USE RESPONSE IMMEDIATELY
           */
           setVerificationData(
             response.data
@@ -458,10 +643,7 @@ function CustomerVerification() {
 
 
           /*
-            =================================
-            STEP 4:
             FETCH COMPLETE SESSION
-            =================================
           */
           await fetchVerification(
             sessionId
@@ -513,7 +695,7 @@ function CustomerVerification() {
 
 
           /*
-            Allow retry after failure
+            Allow retry
           */
           initializedCustomerRef.current =
             null;
@@ -555,11 +737,29 @@ function CustomerVerification() {
       }
 
 
+      const loadingAction =
+        documentMatch
+          ? "document-pass"
+          : "document-fail";
+
+
       try {
 
-        setActionLoading(true);
+        setActionLoading(
+          loadingAction
+        );
 
         setApiError("");
+
+
+        console.log(
+          "Document verification request:",
+          {
+            verificationId,
+            document_match:
+              documentMatch,
+          }
+        );
 
 
         const response =
@@ -572,33 +772,79 @@ function CustomerVerification() {
           );
 
 
-        setVerificationData(
+        console.log(
+          "Document verification response:",
           response.data
         );
 
 
-        await fetchVerification(
-          verificationId
+        /*
+          Update immediately.
+
+          This is important because
+          GET response may arrive slightly
+          later than POST response.
+        */
+        setVerificationData(
+          (previousData) => ({
+            ...(previousData || {}),
+            ...(response.data || {}),
+            document_match:
+              documentMatch,
+          })
         );
+
+
+        /*
+          Get latest backend state
+        */
+        const latestData =
+          await fetchVerification(
+            verificationId
+          );
+
+
+        /*
+          If backend GET does not expose
+          document_match correctly,
+          preserve the clicked result.
+        */
+        if (
+          latestData &&
+          getDocumentMatch(latestData) === null
+        ) {
+
+          setVerificationData(
+            (previousData) => ({
+              ...(previousData || {}),
+              document_match:
+                documentMatch,
+            })
+          );
+
+        }
 
 
       } catch (error) {
 
         console.error(
           "Document verification failed:",
+          error.response?.data ||
           error
         );
 
 
         setApiError(
           error.response?.data?.detail ||
-          "Failed to verify document."
+          "Failed to update document verification."
         );
 
 
       } finally {
 
-        setActionLoading(false);
+        setActionLoading(
+          null
+        );
 
       }
 
@@ -624,11 +870,29 @@ function CustomerVerification() {
       }
 
 
+      const loadingAction =
+        faceMatch
+          ? "face-pass"
+          : "face-fail";
+
+
       try {
 
-        setActionLoading(true);
+        setActionLoading(
+          loadingAction
+        );
 
         setApiError("");
+
+
+        console.log(
+          "Face verification request:",
+          {
+            verificationId,
+            face_match:
+              faceMatch,
+          }
+        );
 
 
         const response =
@@ -641,33 +905,74 @@ function CustomerVerification() {
           );
 
 
-        setVerificationData(
+        console.log(
+          "Face verification response:",
           response.data
         );
 
 
-        await fetchVerification(
-          verificationId
+        /*
+          Update immediately
+        */
+        setVerificationData(
+          (previousData) => ({
+            ...(previousData || {}),
+            ...(response.data || {}),
+            face_match:
+              faceMatch,
+          })
         );
+
+
+        /*
+          Fetch latest backend state
+        */
+        const latestData =
+          await fetchVerification(
+            verificationId
+          );
+
+
+        /*
+          Preserve result if GET response
+          does not return face_match.
+        */
+        if (
+          latestData &&
+          getFaceMatch(latestData) === null
+        ) {
+
+          setVerificationData(
+            (previousData) => ({
+              ...(previousData || {}),
+              face_match:
+                faceMatch,
+            })
+          );
+
+        }
 
 
       } catch (error) {
 
         console.error(
           "Face verification failed:",
+          error.response?.data ||
           error
         );
 
 
         setApiError(
           error.response?.data?.detail ||
-          "Failed to verify face."
+          "Failed to update face verification."
         );
 
 
       } finally {
 
-        setActionLoading(false);
+        setActionLoading(
+          null
+        );
 
       }
 
@@ -695,7 +1000,9 @@ function CustomerVerification() {
 
       try {
 
-        setActionLoading(true);
+        setActionLoading(
+          "finalize"
+        );
 
         setApiError("");
 
@@ -717,10 +1024,19 @@ function CustomerVerification() {
         );
 
 
-        localStorage.setItem(
-          "verificationDecision",
-          response.data.state
-        );
+        const finalState =
+          response.data.state ||
+          response.data.status;
+
+
+        if (finalState) {
+
+          localStorage.setItem(
+            "verificationDecision",
+            finalState
+          );
+
+        }
 
 
         /*
@@ -747,7 +1063,9 @@ function CustomerVerification() {
 
       } finally {
 
-        setActionLoading(false);
+        setActionLoading(
+          null
+        );
 
       }
 
@@ -844,6 +1162,7 @@ function CustomerVerification() {
       customerData?.location ??
       verificationData?.location ??
       null,
+
   };
 
 
@@ -854,9 +1173,13 @@ function CustomerVerification() {
   */
   const handleApprove = () => {
 
+    const state =
+      verificationData?.state ||
+      verificationData?.status;
+
+
     if (
-      verificationData?.state !==
-      "APPROVED"
+      state !== "APPROVED"
     ) {
 
       setApiError(
@@ -892,7 +1215,8 @@ function CustomerVerification() {
   const getStatus = () => {
 
     const state =
-      verificationData?.state;
+      verificationData?.state ||
+      verificationData?.status;
 
 
     if (
@@ -958,48 +1282,75 @@ function CustomerVerification() {
 
   /*
     =================================
-    VERIFICATION STATUS
+    DOCUMENT STATUS
     =================================
   */
+  const documentMatch =
+    getDocumentMatch(
+      verificationData
+    );
+
+
   const documentStatus =
 
-    verificationData?.document_match === true
+    documentMatch === true
       ? "Verified"
 
-      : verificationData?.document_match === false
+      : documentMatch === false
         ? "Failed"
 
         : "Pending";
+
+
+  /*
+    =================================
+    FACE STATUS
+    =================================
+  */
+  const faceMatch =
+    getFaceMatch(
+      verificationData
+    );
 
 
   const faceStatus =
 
-    verificationData?.face_match === true
+    faceMatch === true
       ? "Verified"
 
-      : verificationData?.face_match === false
+      : faceMatch === false
         ? "Failed"
 
         : "Pending";
 
 
+  /*
+    =================================
+    COMPLETION STATUS
+    =================================
+  */
   const documentCompleted =
 
-    verificationData?.document_match === true ||
-    verificationData?.document_match === false;
+    documentMatch === true ||
+    documentMatch === false;
 
 
   const faceCompleted =
 
-    verificationData?.face_match === true ||
-    verificationData?.face_match === false;
+    faceMatch === true ||
+    faceMatch === false;
+
+
+  const verificationState =
+    verificationData?.state ||
+    verificationData?.status;
 
 
   const verificationFinalized =
 
-    verificationData?.state === "APPROVED" ||
-    verificationData?.state === "BLOCKED" ||
-    verificationData?.state === "REVIEW";
+    verificationState === "APPROVED" ||
+    verificationState === "BLOCKED" ||
+    verificationState === "REVIEW";
 
 
   return (
@@ -1195,12 +1546,13 @@ function CustomerVerification() {
                     />
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatus === "Verified"
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        documentStatus === "Verified"
                           ? "bg-green-50 text-green-700"
                           : documentStatus === "Failed"
                             ? "bg-red-50 text-red-700"
                             : "bg-amber-50 text-amber-700"
-                        }`}
+                      }`}
                     >
                       {documentStatus}
                     </span>
@@ -1223,36 +1575,78 @@ function CustomerVerification() {
 
                       <button
                         type="button"
-                        disabled={actionLoading}
+                        disabled={
+                          actionLoading !== null
+                        }
                         onClick={() =>
                           handleDocumentVerification(
                             true
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                          documentStatus === "Verified"
+                            ? "bg-green-700 ring-2 ring-green-200"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
                       >
 
-                        <CircleCheck size={15} />
+                        {actionLoading ===
+                        "document-pass" ? (
 
-                        Mark Passed
+                          <Loader2
+                            size={15}
+                            className="animate-spin"
+                          />
+
+                        ) : (
+
+                          <CircleCheck size={15} />
+
+                        )}
+
+                        {actionLoading ===
+                        "document-pass"
+                          ? "Saving..."
+                          : "Mark Passed"}
 
                       </button>
 
 
                       <button
                         type="button"
-                        disabled={actionLoading}
+                        disabled={
+                          actionLoading !== null
+                        }
                         onClick={() =>
                           handleDocumentVerification(
                             false
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                          documentStatus === "Failed"
+                            ? "bg-red-700 ring-2 ring-red-200"
+                            : "bg-red-600 hover:bg-red-700"
+                        }`}
                       >
 
-                        <CircleX size={15} />
+                        {actionLoading ===
+                        "document-fail" ? (
 
-                        Mark Failed
+                          <Loader2
+                            size={15}
+                            className="animate-spin"
+                          />
+
+                        ) : (
+
+                          <CircleX size={15} />
+
+                        )}
+
+                        {actionLoading ===
+                        "document-fail"
+                          ? "Saving..."
+                          : "Mark Failed"}
 
                       </button>
 
@@ -1275,12 +1669,13 @@ function CustomerVerification() {
                     />
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${faceStatus === "Verified"
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        faceStatus === "Verified"
                           ? "bg-green-50 text-green-700"
                           : faceStatus === "Failed"
                             ? "bg-red-50 text-red-700"
                             : "bg-amber-50 text-amber-700"
-                        }`}
+                      }`}
                     >
                       {faceStatus}
                     </span>
@@ -1295,6 +1690,7 @@ function CustomerVerification() {
                   <p className="mt-1 text-xs text-[#64748B]">
                     Confirm whether the customer's face matches the identity.
                   </p>
+
 
                   <p className="mt-3 text-sm font-semibold text-[#111827]">
 
@@ -1319,36 +1715,78 @@ function CustomerVerification() {
 
                       <button
                         type="button"
-                        disabled={actionLoading}
+                        disabled={
+                          actionLoading !== null
+                        }
                         onClick={() =>
                           handleFaceVerification(
                             true
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                          faceStatus === "Verified"
+                            ? "bg-green-700 ring-2 ring-green-200"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
                       >
 
-                        <CircleCheck size={15} />
+                        {actionLoading ===
+                        "face-pass" ? (
 
-                        Mark Passed
+                          <Loader2
+                            size={15}
+                            className="animate-spin"
+                          />
+
+                        ) : (
+
+                          <CircleCheck size={15} />
+
+                        )}
+
+                        {actionLoading ===
+                        "face-pass"
+                          ? "Saving..."
+                          : "Mark Passed"}
 
                       </button>
 
 
                       <button
                         type="button"
-                        disabled={actionLoading}
+                        disabled={
+                          actionLoading !== null
+                        }
                         onClick={() =>
                           handleFaceVerification(
                             false
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                          faceStatus === "Failed"
+                            ? "bg-red-700 ring-2 ring-red-200"
+                            : "bg-red-600 hover:bg-red-700"
+                        }`}
                       >
 
-                        <CircleX size={15} />
+                        {actionLoading ===
+                        "face-fail" ? (
 
-                        Mark Failed
+                          <Loader2
+                            size={15}
+                            className="animate-spin"
+                          />
+
+                        ) : (
+
+                          <CircleX size={15} />
+
+                        )}
+
+                        {actionLoading ===
+                        "face-fail"
+                          ? "Saving..."
+                          : "Mark Failed"}
 
                       </button>
 
@@ -1374,7 +1812,12 @@ function CustomerVerification() {
                     </h4>
 
                     <p className="mt-1 text-xs text-[#64748B]">
-                      Finalize after completing document and face verification.
+
+                      {!documentCompleted ||
+                      !faceCompleted
+                        ? "Complete both document and face verification before finalizing."
+                        : "Both verification checks are complete. You can now finalize the decision."}
+
                     </p>
 
                   </div>
@@ -1383,7 +1826,7 @@ function CustomerVerification() {
                   <button
                     type="button"
                     disabled={
-                      actionLoading ||
+                      actionLoading !== null ||
                       verificationFinalized ||
                       !documentCompleted ||
                       !faceCompleted
@@ -1394,11 +1837,25 @@ function CustomerVerification() {
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
                   >
 
-                    <ShieldAlert size={17} />
+                    {actionLoading ===
+                    "finalize" ? (
+
+                      <Loader2
+                        size={17}
+                        className="animate-spin"
+                      />
+
+                    ) : (
+
+                      <ShieldAlert size={17} />
+
+                    )}
 
                     {verificationFinalized
                       ? "Verification Finalized"
-                      : "Finalize Verification"}
+                      : actionLoading === "finalize"
+                        ? "Finalizing..."
+                        : "Finalize Verification"}
 
                   </button>
 
@@ -1481,17 +1938,17 @@ function CustomerVerification() {
 
                     <span
                       className={
-                        verificationData?.state ===
-                          "APPROVED"
+                        verificationState ===
+                        "APPROVED"
                           ? "text-green-600"
-                          : verificationData?.state ===
+                          : verificationState ===
                             "BLOCKED"
                             ? "text-red-600"
                             : "text-amber-600"
                       }
                     >
 
-                      {verificationData?.state}
+                      {verificationState}
 
                     </span>
 
@@ -1517,8 +1974,8 @@ function CustomerVerification() {
                   type="button"
                   onClick={handleApprove}
                   disabled={
-                    actionLoading ||
-                    verificationData?.state !==
+                    actionLoading !== null ||
+                    verificationState !==
                     "APPROVED"
                   }
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
