@@ -2,20 +2,38 @@ import os
 import shutil
 import tempfile
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import (
+    FastAPI,
+    UploadFile,
+    File,
+    HTTPException
+)
+
 from fastapi.middleware.cors import CORSMiddleware
 
-from face_verify import verify_face
+from document_verification import (
+    extract_document_photo
+)
+
+from face_verify import (
+    verify_face
+)
 
 
 # ============================================================
-# FastAPI Application
+# FASTAPI APPLICATION
 # ============================================================
 
 app = FastAPI(
+
     title="LockSure Face Verification API",
-    description="AI/CV face verification service for LockSure locker system",
-    version="1.0.0"
+
+    description=(
+        "Dynamic document-face to live-face "
+        "verification service"
+    ),
+
+    version="2.0.0"
 )
 
 
@@ -24,146 +42,346 @@ app = FastAPI(
 # ============================================================
 
 app.add_middleware(
+
     CORSMiddleware,
+
     allow_origins=["*"],
+
     allow_credentials=True,
+
     allow_methods=["*"],
-    allow_headers=["*"],
+
+    allow_headers=["*"]
 )
 
 
 # ============================================================
-# Health Check
+# HEALTH CHECK
 # ============================================================
 
 @app.get("/health")
 def health_check():
 
     return {
-        "service": "face-verification",
-        "status": "running"
+
+        "service":
+            "face-verification",
+
+        "status":
+            "running"
     }
 
 
 # ============================================================
-# Face Verification Endpoint
+# DYNAMIC FACE VERIFICATION
+# ============================================================
+#
+# INPUT:
+#
+# document_image
+#       +
+# live_image
+#
+# PROCESS:
+#
+# document image
+#       ↓
+# extract_document_photo()
+#       ↓
+# document_photo_path
+#       ↓
+# verify_face()
+#       ↑
+# live_image
+#
 # ============================================================
 
 @app.post("/ai/face/verify")
 async def verify_face_api(
-    reference_image: UploadFile = File(...),
+
+    document_image: UploadFile = File(...),
+
     live_image: UploadFile = File(...)
 ):
 
-    reference_temp = None
+    document_temp = None
+
     live_temp = None
+
+    document_photo_path = None
 
     try:
 
-        # ----------------------------------------------------
-        # Validate file types
-        # ----------------------------------------------------
+        # ====================================================
+        # VALIDATE FILE TYPES
+        # ====================================================
 
         allowed_types = {
+
             "image/jpeg",
+
             "image/png",
+
             "image/jpg"
         }
 
-        if reference_image.content_type not in allowed_types:
+        if (
+            document_image.content_type
+            not in allowed_types
+        ):
 
             raise HTTPException(
+
                 status_code=400,
-                detail="Reference image must be JPG or PNG."
+
+                detail=(
+                    "Document must be JPG or PNG."
+                )
             )
 
-        if live_image.content_type not in allowed_types:
+        if (
+            live_image.content_type
+            not in allowed_types
+        ):
 
             raise HTTPException(
+
                 status_code=400,
-                detail="Live image must be JPG or PNG."
+
+                detail=(
+                    "Live image must be JPG or PNG."
+                )
             )
 
-        # ----------------------------------------------------
-        # Create temporary files
-        # ----------------------------------------------------
+        # ====================================================
+        # SAVE DOCUMENT TEMPORARILY
+        # ====================================================
 
-        reference_file = tempfile.NamedTemporaryFile(
+        document_file = tempfile.NamedTemporaryFile(
+
             delete=False,
+
             suffix=".jpg"
         )
+
+        document_temp = (
+            document_file.name
+        )
+
+        document_file.close()
+
+        # ====================================================
+        # SAVE LIVE IMAGE TEMPORARILY
+        # ====================================================
 
         live_file = tempfile.NamedTemporaryFile(
+
             delete=False,
+
             suffix=".jpg"
         )
 
-        reference_temp = reference_file.name
-        live_temp = live_file.name
-
-        reference_file.close()
-        live_file.close()
-
-        # ----------------------------------------------------
-        # Save uploaded files
-        # ----------------------------------------------------
-
-        with open(reference_temp, "wb") as buffer:
-
-            shutil.copyfileobj(
-                reference_image.file,
-                buffer
-            )
-
-        with open(live_temp, "wb") as buffer:
-
-            shutil.copyfileobj(
-                live_image.file,
-                buffer
-            )
-
-        # ----------------------------------------------------
-        # Run AI verification
-        # ----------------------------------------------------
-
-        result = verify_face(
-            reference_temp,
-            live_temp
+        live_temp = (
+            live_file.name
         )
 
-        # ----------------------------------------------------
-        # Return standard response
-        # ----------------------------------------------------
+        live_file.close()
 
-        return {
-            "matched": result.get("matched", False),
-            "confidence": result.get("confidence", 0.0),
-            "status": result.get("status", "ERROR")
-        }
+        # ====================================================
+        # COPY UPLOADED DOCUMENT
+        # ====================================================
+
+        with open(
+
+            document_temp,
+
+            "wb"
+
+        ) as buffer:
+
+            shutil.copyfileobj(
+
+                document_image.file,
+
+                buffer
+            )
+
+        # ====================================================
+        # COPY LIVE IMAGE
+        # ====================================================
+
+        with open(
+
+            live_temp,
+
+            "wb"
+
+        ) as buffer:
+
+            shutil.copyfileobj(
+
+                live_image.file,
+
+                buffer
+            )
+
+        # ====================================================
+        # EXTRACT PHOTO FROM DOCUMENT
+        # ====================================================
+
+        photo_result = (
+            extract_document_photo(
+                document_temp
+            )
+        )
+
+        if not photo_result:
+
+            return {
+
+                "matched":
+                    False,
+
+                "confidence":
+                    0.0,
+
+                "status":
+                    "DOCUMENT_PHOTO_EXTRACTION_FAILED"
+            }
+
+        if not photo_result.get(
+            "success",
+            False
+        ):
+
+            return {
+
+                "matched":
+                    False,
+
+                "confidence":
+                    0.0,
+
+                "status":
+                    "DOCUMENT_PHOTO_EXTRACTION_FAILED",
+
+                "error":
+                    photo_result.get(
+                        "error"
+                    )
+            }
+
+        document_photo_path = (
+            photo_result.get(
+                "photo_path"
+            )
+        )
+
+        if not document_photo_path:
+
+            return {
+
+                "matched":
+                    False,
+
+                "confidence":
+                    0.0,
+
+                "status":
+                    "DOCUMENT_PHOTO_NOT_FOUND"
+            }
+
+        # ====================================================
+        # FACE VERIFICATION
+        # ====================================================
+
+        result = verify_face(
+
+            reference_image=
+                document_photo_path,
+
+            live_image=
+                live_temp
+        )
+
+        # ====================================================
+        # ADD SOURCE INFORMATION
+        # ====================================================
+
+        result["reference_source"] = (
+            "document_photo"
+        )
+
+        result["live_source"] = (
+            "camera_or_live_capture"
+        )
+
+        return result
 
     except HTTPException:
+
         raise
 
     except Exception as error:
 
         return {
-            "matched": False,
-            "confidence": 0.0,
-            "status": "ERROR",
-            "error": "FACE_SERVICE_ERROR",
-            "message": str(error)
+
+            "matched":
+                False,
+
+            "confidence":
+                0.0,
+
+            "status":
+                "FACE_SERVICE_ERROR",
+
+            "error":
+                str(error)
         }
 
     finally:
 
-        # ----------------------------------------------------
-        # Delete temporary files
-        # ----------------------------------------------------
+        # ====================================================
+        # DELETE TEMPORARY DOCUMENT
+        # ====================================================
 
-        if reference_temp and os.path.exists(reference_temp):
+        if (
+            document_temp
+            and os.path.exists(
+                document_temp
+            )
+        ):
 
-            os.remove(reference_temp)
+            os.remove(
+                document_temp
+            )
 
-        if live_temp and os.path.exists(live_temp):
+        # ====================================================
+        # DELETE TEMPORARY LIVE IMAGE
+        # ====================================================
 
-            os.remove(live_temp)
+        if (
+            live_temp
+            and os.path.exists(
+                live_temp
+            )
+        ):
+
+            os.remove(
+                live_temp
+            )
+
+        # ====================================================
+        # DELETE EXTRACTED DOCUMENT FACE
+        # ====================================================
+
+        if (
+            document_photo_path
+            and os.path.exists(
+                document_photo_path
+            )
+        ):
+
+            os.remove(
+                document_photo_path
+            )
