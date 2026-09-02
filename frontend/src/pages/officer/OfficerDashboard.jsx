@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import {
     Activity,
     CheckCircle2,
@@ -10,7 +12,93 @@ import StatCard from "../../components/officer/StatCard";
 import SecurityOverview from "../../components/officer/SecurityOverview";
 import QuickActions from "../../components/officer/QuickActions";
 import RecentOperations from "../../components/officer/RecentOperations";
+
 function OfficerDashboard() {
+    const [stats, setStats] = useState({
+        totalOperations: 0,
+        successfulOperations: 0,
+        pendingOperations: 0,
+        highRiskAlerts: 0,
+    });
+
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const [operationsResponse, alertsResponse] =
+                    await Promise.all([
+                        fetch("http://127.0.0.1:8000/locker/operations"),
+                        fetch("http://127.0.0.1:8000/security-alerts/"),
+                    ]);
+
+                if (!operationsResponse.ok) {
+                    throw new Error(
+                        "Failed to fetch locker operations"
+                    );
+                }
+
+                if (!alertsResponse.ok) {
+                    throw new Error(
+                        "Failed to fetch security alerts"
+                    );
+                }
+
+                const operationsData =
+                    await operationsResponse.json();
+
+                const alertsData =
+                    await alertsResponse.json();
+
+                const operations =
+                    Array.isArray(operationsData)
+                        ? operationsData
+                        : operationsData.operations || [];
+
+                const alerts =
+                    Array.isArray(alertsData)
+                        ? alertsData
+                        : [];
+
+                const successfulOperations =
+                    operations.filter(
+                        (operation) =>
+                            String(
+                                operation.operation_status || ""
+                            ).toUpperCase() === "SUCCESS"
+                    ).length;
+
+                const pendingOperations =
+                    operations.filter(
+                        (operation) =>
+                            String(
+                                operation.operation_status || ""
+                            ).toUpperCase() === "PENDING"
+                    ).length;
+
+                const highRiskAlerts =
+                    alerts.filter(
+                        (alert) =>
+                            String(
+                                alert.severity || ""
+                            ).toUpperCase() === "HIGH"
+                    ).length;
+
+                setStats({
+                    totalOperations: operations.length,
+                    successfulOperations,
+                    pendingOperations,
+                    highRiskAlerts,
+                });
+            } catch (error) {
+                console.error(
+                    "Dashboard data fetch error:",
+                    error
+                );
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
     return (
         <OfficerLayout>
 
@@ -34,6 +122,7 @@ function OfficerDashboard() {
                     </div>
 
                     <div className="flex items-center gap-2 rounded-xl border border-[#D1FAE5] bg-[#ECFDF5] px-3 py-2">
+
                         <Activity
                             size={16}
                             className="text-[#10B981]"
@@ -42,6 +131,7 @@ function OfficerDashboard() {
                         <span className="text-xs font-semibold text-[#047857]">
                             All systems operational
                         </span>
+
                     </div>
 
                 </div>
@@ -53,31 +143,31 @@ function OfficerDashboard() {
 
                 <StatCard
                     title="Total Locker Operations"
-                    value="128"
-                    description="+12.4% this week"
+                    value={stats.totalOperations}
+                    description="Real-time operation data"
                     icon={Activity}
                     variant="blue"
                 />
 
                 <StatCard
                     title="Successful"
-                    value="104"
-                    description="81.2% success rate"
+                    value={stats.successfulOperations}
+                    description="Successful locker operations"
                     icon={CheckCircle2}
                     variant="green"
                 />
 
                 <StatCard
                     title="Pending"
-                    value="16"
-                    description="Awaiting officer review"
+                    value={stats.pendingOperations}
+                    description="Awaiting completion"
                     icon={Clock3}
                     variant="amber"
                 />
 
                 <StatCard
                     title="High Risk"
-                    value="8"
+                    value={stats.highRiskAlerts}
                     description="Requires immediate attention"
                     icon={ShieldAlert}
                     variant="red"
