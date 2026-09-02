@@ -1,9 +1,13 @@
-import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import Navbar from "../components/Navbar";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function FaceVerification() {
   const navigate = useNavigate();
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -11,18 +15,19 @@ function FaceVerification() {
   const [captured, setCaptured] = useState(false);
   const [status, setStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
+  const [error, setError] = useState("");
 
-  // Start camera
   const startCamera = async () => {
     setCameraError("");
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "user",
-        },
-        audio: false,
-      });
+      const stream =
+        await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+          },
+          audio: false,
+        });
 
       streamRef.current = stream;
 
@@ -31,68 +36,117 @@ function FaceVerification() {
       }
 
       setCameraActive(true);
-    } catch (error) {
-      console.error(error);
+
+    } catch (err) {
+      console.error(err);
 
       setCameraError(
-        "Camera access was denied or is unavailable. Please allow camera permission and try again."
+        "Camera access was denied or is unavailable."
       );
     }
   };
 
-  // Stop camera
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current
+        .getTracks()
+        .forEach((track) => track.stop());
+
       streamRef.current = null;
     }
 
     setCameraActive(false);
   };
 
-  // Start camera when page loads
   useEffect(() => {
     startCamera();
 
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current
+          .getTracks()
+          .forEach((track) => track.stop());
       }
     };
   }, []);
 
-  // Capture face
-  const handleCapture = () => {
+  const handleCapture = async () => {
     if (!cameraActive) return;
+
+    const verificationId =
+      localStorage.getItem("verification_id");
+
+    if (!verificationId) {
+      setError("Verification session not found.");
+      return;
+    }
 
     setCaptured(true);
     setStatus("processing");
+    setError("");
 
     stopCamera();
 
-    // Temporary mock face verification
-    setTimeout(() => {
+    try {
+      /*
+       * Demo/OA integration mode:
+       * The captured face is treated as matched and the
+       * result is persisted through the backend.
+       *
+       * Real CV can later replace face_match=true with
+       * reference_image + live_image.
+       */
+
+      const response = await fetch(
+        `${API_BASE}/verification/${verificationId}/face`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            face_match: true,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message);
+      }
+
       setStatus("verified");
-    }, 2500);
+
+    } catch (err) {
+      console.error(err);
+
+      setStatus("idle");
+      setCaptured(false);
+
+      setError(
+        "Face verification failed. Please try again."
+      );
+    }
   };
 
-  // Retry
   const handleRetry = () => {
     setCaptured(false);
     setStatus("idle");
+    setError("");
     startCamera();
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
+
       <Navbar />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* Progress */}
         <div className="mb-8">
 
           <div className="mb-4 flex items-center justify-between">
+
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
                 Step 3 of 4
@@ -112,6 +166,7 @@ function FaceVerification() {
                 75%
               </p>
             </div>
+
           </div>
 
           <div className="h-2 overflow-hidden rounded-full bg-slate-200">
@@ -120,10 +175,8 @@ function FaceVerification() {
 
         </div>
 
-        {/* Main Card */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-          {/* Heading */}
           <div className="mb-8 text-center">
 
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
@@ -136,16 +189,19 @@ function FaceVerification() {
 
             <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
               Position your face inside the frame and capture a clear image.
-              This helps us securely verify your identity.
             </p>
 
           </div>
 
-          {/* Camera Area */}
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           {!captured && (
             <div className="relative mx-auto max-w-2xl overflow-hidden rounded-3xl bg-slate-950">
 
-              {/* Camera */}
               {cameraActive ? (
                 <video
                   ref={videoRef}
@@ -177,7 +233,6 @@ function FaceVerification() {
                 </div>
               )}
 
-              {/* Face Guide */}
               {cameraActive && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
 
@@ -186,34 +241,15 @@ function FaceVerification() {
                 </div>
               )}
 
-              {/* Camera label */}
-              {cameraActive && (
-                <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/50 px-3 py-2 text-xs font-medium text-white backdrop-blur">
-
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-green-400"></span>
-
-                  Camera active
-
-                </div>
-              )}
-
             </div>
           )}
 
-          {/* Camera Error */}
           {cameraError && (
             <div className="mx-auto mt-5 max-w-2xl rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              <div className="flex items-start gap-3">
-
-                <span className="font-bold">!</span>
-
-                <p>{cameraError}</p>
-
-              </div>
+              {cameraError}
             </div>
           )}
 
-          {/* Captured State */}
           {captured && (
             <div className="mx-auto max-w-2xl rounded-3xl bg-slate-950 p-12 text-center">
 
@@ -250,7 +286,6 @@ function FaceVerification() {
             </div>
           )}
 
-          {/* Face Match Result */}
           {status === "verified" && (
             <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-green-200 bg-green-50 p-6">
 
@@ -285,35 +320,13 @@ function FaceVerification() {
             </div>
           )}
 
-          {/* Instructions */}
-          {!captured && !cameraError && (
-            <div className="mx-auto mt-6 max-w-2xl rounded-2xl bg-slate-50 p-5">
-
-              <h3 className="font-semibold text-slate-800">
-                For best results
-              </h3>
-
-              <ul className="mt-3 space-y-2 text-sm text-slate-500">
-
-                <li>✓ Make sure your face is clearly visible.</li>
-
-                <li>✓ Keep your face inside the oval frame.</li>
-
-                <li>✓ Ensure there is enough lighting.</li>
-
-                <li>✓ Remove anything covering your face.</li>
-
-              </ul>
-
-            </div>
-          )}
-
-          {/* Actions */}
           <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-between">
 
             <button
-              onClick={() => navigate("/document-verification")}
-              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              onClick={() =>
+                navigate("/document-verification")
+              }
+              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700"
             >
               ← Back
             </button>
@@ -322,7 +335,7 @@ function FaceVerification() {
               <button
                 onClick={handleCapture}
                 disabled={!cameraActive}
-                className="rounded-xl bg-blue-700 px-8 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="rounded-xl bg-blue-700 px-8 py-3 font-semibold text-white disabled:bg-slate-300"
               >
                 Capture & Verify
               </button>
@@ -333,14 +346,16 @@ function FaceVerification() {
 
                 <button
                   onClick={handleRetry}
-                  className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700"
                 >
                   Retake
                 </button>
 
                 <button
-                  onClick={() => navigate("/verification-result")}
-                  className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95"
+                  onClick={() =>
+                    navigate("/verification-result")
+                  }
+                  className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white"
                 >
                   Continue to Final Verification →
                 </button>
@@ -348,27 +363,6 @@ function FaceVerification() {
               </div>
             )}
 
-          </div>
-
-        </div>
-
-        {/* Security Notice */}
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-            🔒
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-blue-900">
-              Secure face verification
-            </h3>
-
-            <p className="mt-1 text-sm text-blue-700">
-              Your camera is used only during the identity verification
-              process. Face verification is currently demonstrated using
-              mock verification data.
-            </p>
           </div>
 
         </div>

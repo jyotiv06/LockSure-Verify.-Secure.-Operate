@@ -6,17 +6,26 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import StatusBadge from "../components/StatusBadge";
 
-import { customer as mockCustomer, verificationStatus } from "../data/mockData";
+import { customer as mockCustomer } from "../data/mockData";
 import { getCurrentCustomer } from "../api/customer";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function Dashboard() {
   const navigate = useNavigate();
 
   const [customer, setCustomer] = useState(mockCustomer);
+  const [verification, setVerification] = useState({
+    document_match: null,
+    face_match: null,
+    state: null,
+    risk_decision: null,
+  });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCustomer = async () => {
+    const fetchDashboard = async () => {
       const token = localStorage.getItem("token");
 
       if (!token) {
@@ -25,6 +34,7 @@ function Dashboard() {
       }
 
       try {
+        // Get REAL logged-in customer
         const data = await getCurrentCustomer(token);
 
         setCustomer({
@@ -32,21 +42,51 @@ function Dashboard() {
           ...data,
           name: data.full_name || mockCustomer.name,
           customerId: data.customer_id || mockCustomer.customerId,
-          accountStatus: data.account_status || mockCustomer.accountStatus,
+          accountStatus:
+            data.account_status || mockCustomer.accountStatus,
           email: data.email || "",
         });
-      } catch (error) {
-        console.error("Unable to fetch customer:", error);
 
-        // Keep mock data if backend customer data is unavailable
-        setCustomer(mockCustomer);
+        // Get latest verification session
+        const verificationId =
+          localStorage.getItem("verification_id");
+
+        if (verificationId) {
+          const response = await fetch(
+            `${API_BASE}/verification/${verificationId}`
+          );
+
+          if (response.ok) {
+            const verificationData = await response.json();
+
+            setVerification(verificationData);
+          }
+        }
+      } catch (error) {
+        console.error("Unable to fetch dashboard:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCustomer();
+    fetchDashboard();
   }, [navigate]);
+
+  const documentStatus =
+    verification.document_match === true
+      ? "Verified"
+      : verification.document_match === false
+        ? "Failed"
+        : "Pending";
+
+  const faceStatus =
+    verification.face_match === true
+      ? "Verified"
+      : verification.face_match === false
+        ? "Failed"
+        : "Pending";
+
+  const profileStatus = "Verified";
 
   if (loading) {
     return (
@@ -69,7 +109,7 @@ function Dashboard() {
 
       <main className="max-w-6xl mx-auto px-6 py-8">
 
-        {/* Welcome Section */}
+        {/* Welcome */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800">
             Welcome back, {customer.name}
@@ -109,7 +149,7 @@ function Dashboard() {
             </p>
 
             <p className="text-xl font-bold text-gray-800 mt-2">
-              {customer.lockerNumber}
+              {customer.lockerNumber || "Not assigned"}
             </p>
           </Card>
 
@@ -174,7 +214,7 @@ function Dashboard() {
               </p>
 
               <p className="font-semibold text-gray-800 mt-1">
-                {customer.accountNumber}
+                {customer.accountNumber || "Not available"}
               </p>
             </div>
 
@@ -184,7 +224,7 @@ function Dashboard() {
               </p>
 
               <p className="font-semibold text-gray-800 mt-1">
-                {customer.branch}
+                {customer.branch || "Not available"}
               </p>
             </div>
 
@@ -207,17 +247,17 @@ function Dashboard() {
 
             <div className="flex justify-between items-center">
               <span>Profile Verification</span>
-              <StatusBadge status={verificationStatus.profile} />
+              <StatusBadge status={profileStatus} />
             </div>
 
             <div className="flex justify-between items-center">
               <span>Document Verification</span>
-              <StatusBadge status={verificationStatus.document} />
+              <StatusBadge status={documentStatus} />
             </div>
 
             <div className="flex justify-between items-center">
               <span>Face Verification</span>
-              <StatusBadge status={verificationStatus.face} />
+              <StatusBadge status={faceStatus} />
             </div>
 
           </div>

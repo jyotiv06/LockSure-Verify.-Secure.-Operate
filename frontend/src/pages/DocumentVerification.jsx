@@ -1,6 +1,10 @@
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRef, useState } from "react";
+
 import Navbar from "../components/Navbar";
+import { getCurrentCustomer } from "../api/customer";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function DocumentVerification() {
   const navigate = useNavigate();
@@ -9,6 +13,104 @@ function DocumentVerification() {
   const [document, setDocument] = useState(null);
   const [preview, setPreview] = useState(null);
   const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const initializeVerification = async () => {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      try {
+        // If a session already exists, reuse it
+        const existingId = localStorage.getItem("verification_id");
+
+        if (existingId) {
+          console.log(
+            "Using existing verification session:",
+            existingId
+          );
+          return;
+        }
+
+        const customer = await getCurrentCustomer(token);
+
+        console.log("REAL CUSTOMER:", customer);
+
+        const customerId = customer.customer_id;
+
+        /*
+        * Current DB:
+        * locker_id = 252
+        * locker_number = L001
+        *
+        * IMPORTANT:
+        * Backend verification API expects locker_id (integer),
+        * NOT locker_number.
+        */
+        const lockerId = 252;
+
+        const response = await fetch(
+          `${API_BASE}/verification/start`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              customer_id: 1,
+              locker_id: "L001",
+              account_status: customer.account_status || "ACTIVE",
+              failed_attempts: 0,
+              access_attempts_last_hour: 0,
+              customer_data: {
+                  name: customer.full_name,
+                  email: customer.email,
+                  customer_code: customer.customer_id,
+              },
+            }),
+          }
+        );
+
+        const data = await response.json();
+
+        console.log("VERIFICATION STATUS:", response.status);
+        console.log("VERIFICATION START RESPONSE:", JSON.stringify(data, null, 2));
+
+        if (!response.ok) {
+          throw new Error(
+            data.detail || "Unable to start verification"
+          );
+        }
+
+        localStorage.setItem(
+          "verification_id",
+          String(data.verification_id)
+        );
+
+        console.log(
+          "Verification session created:",
+          data.verification_id
+        );
+
+      } catch (err) {
+        console.error(
+          "Verification initialization failed:",
+          err
+        );
+
+        setError(
+          err.message ||
+            "Unable to start verification."
+        );
+      }
+    };
+
+    initializeVerification();
+  }, [navigate]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -18,17 +120,61 @@ function DocumentVerification() {
     setDocument(file);
     setPreview(URL.createObjectURL(file));
     setStatus("idle");
+    setError("");
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!document) return;
 
-    setStatus("processing");
+    const verificationId =
+      localStorage.getItem("verification_id");
 
-    // Temporary mock verification
-    setTimeout(() => {
+    if (!verificationId) {
+      setError("Verification session not found.");
+      return;
+    }
+
+    setStatus("processing");
+    setError("");
+
+    try {
+      /*
+       * Demo/OA integration mode:
+       * The uploaded document is treated as successfully
+       * verified and the result is persisted in PostgreSQL.
+       *
+       * Real OCR can later replace document_match=true
+       * with image_path/customer_data.
+       */
+
+      const response = await fetch(
+        `${API_BASE}/verification/${verificationId}/document`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            document_match: true,
+            customer_data: {},
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message);
+      }
+
       setStatus("verified");
-    }, 2000);
+
+    } catch (err) {
+      console.error(err);
+      setStatus("idle");
+      setError(
+        "Document verification failed. Please try again."
+      );
+    }
   };
 
   const handleRemove = () => {
@@ -47,14 +193,15 @@ function DocumentVerification() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+
       <Navbar />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* Progress */}
         <div className="mb-8">
 
           <div className="mb-4 flex items-center justify-between">
+
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
                 Step 2 of 4
@@ -66,6 +213,7 @@ function DocumentVerification() {
             </div>
 
             <div className="hidden text-right sm:block">
+
               <p className="text-sm text-slate-500">
                 Verification progress
               </p>
@@ -73,7 +221,9 @@ function DocumentVerification() {
               <p className="font-bold text-blue-700">
                 50%
               </p>
+
             </div>
+
           </div>
 
           <div className="h-2 overflow-hidden rounded-full bg-slate-200">
@@ -82,10 +232,8 @@ function DocumentVerification() {
 
         </div>
 
-        {/* Main Card */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-          {/* Heading */}
           <div className="mb-8 text-center">
 
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
@@ -98,13 +246,17 @@ function DocumentVerification() {
 
             <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
               Upload a clear image or PDF of your registered identity
-              document. The document will be securely verified before you
-              continue.
+              document.
             </p>
 
           </div>
 
-          {/* Upload Area */}
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           {!document && (
             <div
               onClick={() => fileInputRef.current?.click()}
@@ -138,7 +290,6 @@ function DocumentVerification() {
             </div>
           )}
 
-          {/* Preview */}
           {document && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
 
@@ -156,14 +307,13 @@ function DocumentVerification() {
 
                 <button
                   onClick={handleRemove}
-                  className="text-sm font-semibold text-red-600 hover:text-red-700"
+                  className="text-sm font-semibold text-red-600"
                 >
                   Remove
                 </button>
 
               </div>
 
-              {/* Image Preview */}
               {document.type.startsWith("image/") && preview && (
                 <div className="flex min-h-64 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
                   <img
@@ -174,7 +324,6 @@ function DocumentVerification() {
                 </div>
               )}
 
-              {/* PDF Preview */}
               {document.type === "application/pdf" && (
                 <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white">
                   <span className="text-5xl">📄</span>
@@ -192,7 +341,6 @@ function DocumentVerification() {
             </div>
           )}
 
-          {/* Processing */}
           {status === "processing" && (
             <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-6 text-center">
 
@@ -202,14 +350,9 @@ function DocumentVerification() {
                 Verifying document...
               </h3>
 
-              <p className="mt-1 text-sm text-blue-700">
-                Please wait while your document is being processed.
-              </p>
-
             </div>
           )}
 
-          {/* Verified */}
           {status === "verified" && (
             <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-6">
 
@@ -234,12 +377,11 @@ function DocumentVerification() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-between">
 
             <button
               onClick={() => navigate("/profile")}
-              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700"
             >
               ← Back
             </button>
@@ -247,7 +389,7 @@ function DocumentVerification() {
             {status === "verified" ? (
               <button
                 onClick={continueToFace}
-                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95"
+                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white"
               >
                 Continue to Face Verification →
               </button>
@@ -255,7 +397,7 @@ function DocumentVerification() {
               <button
                 onClick={handleVerify}
                 disabled={!document || status === "processing"}
-                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white disabled:bg-slate-300"
               >
                 {status === "processing"
                   ? "Verifying..."
@@ -263,26 +405,6 @@ function DocumentVerification() {
               </button>
             )}
 
-          </div>
-
-        </div>
-
-        {/* Security Notice */}
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-            🔒
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-blue-900">
-              Secure document processing
-            </h3>
-
-            <p className="mt-1 text-sm text-blue-700">
-              Your document is used only for verification purposes and is
-              processed through the secure verification workflow.
-            </p>
           </div>
 
         </div>

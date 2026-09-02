@@ -19,8 +19,6 @@ router = APIRouter(
 class VerificationStartRequest(BaseModel):
     customer_id: int
     locker_id: str
-
-    # Risk / intelligence inputs
     account_status: str = "ACTIVE"
     failed_attempts: int = Field(default=0, ge=0)
     access_attempts_last_hour: int = Field(default=0, ge=0)

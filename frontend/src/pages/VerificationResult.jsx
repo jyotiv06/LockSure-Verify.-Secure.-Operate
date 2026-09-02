@@ -1,11 +1,128 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import Navbar from "../components/Navbar";
+
+const API_BASE = "http://127.0.0.1:8000";
 
 function VerificationResult() {
   const navigate = useNavigate();
 
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const finalize = async () => {
+      const verificationId =
+        localStorage.getItem("verification_id");
+
+      if (!verificationId) {
+        setError("Verification session not found.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/verification/${verificationId}/finalize`,
+          {
+            method: "POST",
+          }
+        );
+
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message);
+        }
+
+        const data = await response.json();
+
+        setResult(data);
+
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Unable to finalize verification. Please make sure document and face verification are complete."
+        );
+
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    finalize();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+
+        <Navbar />
+
+        <main className="flex min-h-[70vh] items-center justify-center">
+
+          <div className="text-center">
+
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700"></div>
+
+            <p className="mt-4 text-slate-600">
+              Finalizing verification...
+            </p>
+
+          </div>
+
+        </main>
+
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+
+        <Navbar />
+
+        <main className="mx-auto max-w-3xl px-6 py-12">
+
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+
+            <h2 className="text-2xl font-bold text-red-800">
+              Verification Error
+            </h2>
+
+            <p className="mt-3 text-red-700">
+              {error}
+            </p>
+
+            <button
+              onClick={() =>
+                navigate("/dashboard")
+              }
+              className="mt-6 rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white"
+            >
+              Back to Dashboard
+            </button>
+
+          </div>
+
+        </main>
+
+      </div>
+    );
+  }
+
+  const approved =
+    result?.state === "APPROVED";
+
+  const riskScore =
+    Number(result?.risk_score ?? 0);
+
   return (
     <div className="min-h-screen bg-slate-50">
+
       <Navbar />
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
@@ -14,7 +131,9 @@ function VerificationResult() {
         <div className="mb-8">
 
           <div className="mb-4 flex items-center justify-between">
+
             <div>
+
               <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
                 Step 4 of 4
               </p>
@@ -22,9 +141,11 @@ function VerificationResult() {
               <h1 className="mt-1 text-3xl font-bold text-slate-900">
                 Final Verification
               </h1>
+
             </div>
 
             <div className="hidden text-right sm:block">
+
               <p className="text-sm text-slate-500">
                 Verification progress
               </p>
@@ -32,7 +153,9 @@ function VerificationResult() {
               <p className="font-bold text-green-600">
                 100%
               </p>
+
             </div>
+
           </div>
 
           <div className="h-2 overflow-hidden rounded-full bg-slate-200">
@@ -41,35 +164,44 @@ function VerificationResult() {
 
         </div>
 
-        {/* Approval Banner */}
-        <div className="mb-6 overflow-hidden rounded-3xl bg-gradient-to-r from-green-600 to-emerald-500 p-8 text-white shadow-lg">
+        {/* Result Banner */}
+        <div
+          className={`mb-6 overflow-hidden rounded-3xl p-8 text-white shadow-lg ${
+            approved
+              ? "bg-gradient-to-r from-green-600 to-emerald-500"
+              : "bg-gradient-to-r from-red-600 to-red-500"
+          }`}
+        >
 
           <div className="flex flex-col items-center text-center sm:flex-row sm:text-left">
 
             <div className="mb-5 flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/20 text-5xl sm:mb-0 sm:mr-6">
-              ✓
+              {approved ? "✓" : "!"}
             </div>
 
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-green-100">
+
+              <p className="text-sm font-semibold uppercase tracking-widest">
                 Verification Complete
               </p>
 
               <h2 className="mt-1 text-3xl font-bold">
-                Operation Approved
+                {approved
+                  ? "Operation Approved"
+                  : result?.state || "Verification Review"}
               </h2>
 
-              <p className="mt-2 text-green-100">
-                All required verification checks have been successfully
-                completed.
+              <p className="mt-2">
+                {result?.reason}
               </p>
+
             </div>
 
           </div>
 
         </div>
 
-        {/* Verification Summary */}
+        {/* Summary */}
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
           <div className="mb-7">
@@ -92,10 +224,11 @@ function VerificationResult() {
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
-                  ✓
+                  {result?.document_match ? "✓" : "!"}
                 </div>
 
                 <div>
+
                   <p className="font-bold text-slate-800">
                     Document Verification
                   </p>
@@ -103,12 +236,15 @@ function VerificationResult() {
                   <p className="text-sm text-slate-500">
                     Identity document successfully verified
                   </p>
+
                 </div>
 
               </div>
 
               <span className="rounded-full bg-green-100 px-4 py-2 text-xs font-bold text-green-700">
-                VERIFIED
+                {result?.document_match
+                  ? "VERIFIED"
+                  : "FAILED"}
               </span>
 
             </div>
@@ -119,57 +255,34 @@ function VerificationResult() {
               <div className="flex items-center gap-4">
 
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
-                  ✓
+                  {result?.face_match ? "✓" : "!"}
                 </div>
 
                 <div>
+
                   <p className="font-bold text-slate-800">
                     Face Verification
                   </p>
 
                   <p className="text-sm text-slate-500">
-                    Face match score: 97.8%
+                    Identity successfully matched
                   </p>
+
                 </div>
 
               </div>
 
               <span className="rounded-full bg-green-100 px-4 py-2 text-xs font-bold text-green-700">
-                VERIFIED
-              </span>
-
-            </div>
-
-            {/* Account */}
-            <div className="flex items-center justify-between rounded-2xl border border-green-100 bg-green-50 p-5">
-
-              <div className="flex items-center gap-4">
-
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-xl text-green-700">
-                  ✓
-                </div>
-
-                <div>
-                  <p className="font-bold text-slate-800">
-                    Account Status
-                  </p>
-
-                  <p className="text-sm text-slate-500">
-                    Customer account is active
-                  </p>
-                </div>
-
-              </div>
-
-              <span className="rounded-full bg-green-100 px-4 py-2 text-xs font-bold text-green-700">
-                ACTIVE
+                {result?.face_match
+                  ? "VERIFIED"
+                  : "FAILED"}
               </span>
 
             </div>
 
           </div>
 
-          {/* Risk Section */}
+          {/* Risk */}
           <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
 
             <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -182,16 +295,16 @@ function VerificationResult() {
 
                 <div className="mt-2 flex items-center gap-3">
 
-                  <span className="h-4 w-4 rounded-full bg-green-500 shadow-sm"></span>
+                  <span className="h-4 w-4 rounded-full bg-green-500"></span>
 
                   <span className="text-2xl font-bold text-green-700">
-                    LOW RISK
+                    {result?.risk_level || "UNKNOWN"} RISK
                   </span>
 
                 </div>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  Verification checks indicate a low-risk locker operation.
+                  {result?.reason}
                 </p>
 
               </div>
@@ -203,21 +316,28 @@ function VerificationResult() {
                 </p>
 
                 <p className="text-4xl font-bold text-slate-900">
-                  12<span className="text-xl text-slate-400">/100</span>
+                  {riskScore}
+                  <span className="text-xl text-slate-400">
+                    /100
+                  </span>
                 </p>
 
               </div>
 
             </div>
 
-            {/* Risk Bar */}
             <div className="mt-6">
 
               <div className="h-3 overflow-hidden rounded-full bg-slate-200">
 
                 <div
                   className="h-full rounded-full bg-green-500"
-                  style={{ width: "12%" }}
+                  style={{
+                    width: `${Math.min(
+                      riskScore,
+                      100
+                    )}%`,
+                  }}
                 ></div>
 
               </div>
@@ -232,23 +352,48 @@ function VerificationResult() {
           </div>
 
           {/* Final Status */}
-          <div className="mt-8 rounded-2xl border-2 border-green-200 bg-green-50 p-7 text-center">
+          <div
+            className={`mt-8 rounded-2xl border-2 p-7 text-center ${
+              approved
+                ? "border-green-200 bg-green-50"
+                : "border-red-200 bg-red-50"
+            }`}
+          >
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-3xl text-white shadow-lg">
-              ✓
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full text-3xl text-white shadow-lg ${
+                approved
+                  ? "bg-green-500"
+                  : "bg-red-500"
+              }`}
+            >
+              {approved ? "✓" : "!"}
             </div>
 
-            <p className="mt-4 text-sm font-semibold uppercase tracking-widest text-green-700">
+            <p
+              className={`mt-4 text-sm font-semibold uppercase tracking-widest ${
+                approved
+                  ? "text-green-700"
+                  : "text-red-700"
+              }`}
+            >
               Final Status
             </p>
 
-            <h2 className="mt-1 text-3xl font-extrabold text-green-800">
-              OPERATION APPROVED
+            <h2
+              className={`mt-1 text-3xl font-extrabold ${
+                approved
+                  ? "text-green-800"
+                  : "text-red-800"
+              }`}
+            >
+              {approved
+                ? "OPERATION APPROVED"
+                : result?.state}
             </h2>
 
-            <p className="mx-auto mt-2 max-w-xl text-sm text-green-700">
-              Your identity has been verified and you are eligible to proceed
-              with the locker operation.
+            <p className="mx-auto mt-2 max-w-xl text-sm text-slate-600">
+              {result?.reason}
             </p>
 
           </div>
@@ -257,15 +402,20 @@ function VerificationResult() {
           <div className="mt-8 flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-center">
 
             <button
-              onClick={() => navigate("/dashboard")}
-              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+              onClick={() =>
+                navigate("/dashboard")
+              }
+              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700"
             >
               ← Back to Dashboard
             </button>
 
             <button
-              onClick={() => navigate("/locker-status")}
-              className="rounded-xl bg-blue-700 px-7 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95"
+              onClick={() =>
+                navigate("/locker-status")
+              }
+              disabled={!approved}
+              className="rounded-xl bg-blue-700 px-7 py-3 font-semibold text-white disabled:bg-slate-300"
             >
               View Locker Status →
             </button>
@@ -274,28 +424,8 @@ function VerificationResult() {
 
         </div>
 
-        {/* Security Notice */}
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-            🔒
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-blue-900">
-              Verification completed securely
-            </h3>
-
-            <p className="mt-1 text-sm text-blue-700">
-              The displayed results are currently using demonstration data.
-              They will be connected to the real verification and risk APIs
-              when backend integration is completed.
-            </p>
-          </div>
-
-        </div>
-
       </main>
+
     </div>
   );
 }
