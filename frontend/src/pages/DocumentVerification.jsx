@@ -1,222 +1,293 @@
-import { useState } from "react";
-import { Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useRef, useState } from "react";
+import Navbar from "../components/Navbar";
 
-import api from "../services/api";
+function DocumentVerification() {
+  const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
-function DocumentVerification({
-  verificationData,
-  verificationId,
-}) {
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [verificationResult, setVerificationResult] =
-    useState(null);
+  const [document, setDocument] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [status, setStatus] = useState("idle");
 
-  const handleFileChange = (event) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
 
     if (!file) return;
 
-    setSelectedFile(file);
-    setError("");
-    setVerificationResult(null);
+    setDocument(file);
+    setPreview(URL.createObjectURL(file));
+    setStatus("idle");
   };
 
-  const handleVerifyDocument = async () => {
-    if (!selectedFile) {
-      setError("Please select a document first.");
-      return;
+  const handleVerify = () => {
+    if (!document) return;
+
+    setStatus("processing");
+
+    // Temporary mock verification
+    setTimeout(() => {
+      setStatus("verified");
+    }, 2000);
+  };
+
+  const handleRemove = () => {
+    setDocument(null);
+    setPreview(null);
+    setStatus("idle");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
+  };
 
-    // Prefer prop, fallback to localStorage
-    const activeVerificationId =
-      verificationId ||
-      localStorage.getItem("verificationId");
-
-    if (!activeVerificationId) {
-      setError(
-        "Verification session not found. Please start verification again."
-      );
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      /*
-        Current backend API expects JSON.
-
-        The selected file is currently only used
-        as a UI selection because the backend
-        endpoint does not yet support multipart
-        file uploads.
-      */
-
-      const response = await api.post(
-        `/verification/${activeVerificationId}/document`,
-        {
-          document_match: true,
-        }
-      );
-
-      console.log(
-        "Document verification result:",
-        response.data
-      );
-
-      setVerificationResult(response.data);
-
-    } catch (error) {
-      console.error(
-        "Document verification error:",
-        error
-      );
-
-      setError(
-        error.response?.data?.detail ||
-          "Document verification failed."
-      );
-
-    } finally {
-      setLoading(false);
-    }
+  const continueToFace = () => {
+    navigate("/face-verification");
   };
 
   return (
-    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
 
-      {/* Header */}
-      <div className="mb-5">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
 
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#2563EB]">
-          Step 2
-        </p>
+        {/* Progress */}
+        <div className="mb-8">
 
-        <h3 className="mt-1 text-lg font-bold text-[#111827]">
-          Document Verification
-        </h3>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+                Step 2 of 4
+              </p>
 
-        <p className="mt-1 text-sm text-[#64748B]">
-          Upload and verify the customer's identity document.
-        </p>
+              <h1 className="mt-1 text-3xl font-bold text-slate-900">
+                Document Verification
+              </h1>
+            </div>
 
-      </div>
+            <div className="hidden text-right sm:block">
+              <p className="text-sm text-slate-500">
+                Verification progress
+              </p>
 
+              <p className="font-bold text-blue-700">
+                50%
+              </p>
+            </div>
+          </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-
-          <AlertCircle size={18} />
-
-          {error}
-
-        </div>
-      )}
-
-
-      {/* Success */}
-      {verificationResult && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-
-          <CheckCircle2 size={18} />
-
-          Document verification completed successfully.
+          <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full w-1/2 rounded-full bg-blue-700"></div>
+          </div>
 
         </div>
-      )}
 
+        {/* Main Card */}
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
-      {/* Upload Area */}
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#CBD5E1] p-8 transition hover:border-[#2563EB] hover:bg-blue-50">
+          {/* Heading */}
+          <div className="mb-8 text-center">
 
-        <Upload
-          size={32}
-          className="mb-3 text-[#2563EB]"
-        />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl">
+              📄
+            </div>
 
-        <p className="font-semibold text-[#334155]">
-          Choose identity document
-        </p>
+            <h2 className="text-2xl font-bold text-slate-900">
+              Upload your identity document
+            </h2>
 
-        <p className="mt-1 text-xs text-[#64748B]">
-          Aadhaar, PAN, Passport or Driving Licence
-        </p>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-slate-500">
+              Upload a clear image or PDF of your registered identity
+              document. The document will be securely verified before you
+              continue.
+            </p>
 
-        <p className="mt-1 text-xs text-[#94A3B8]">
-          JPG, JPEG, PNG or PDF
-        </p>
+          </div>
 
-        <input
-          type="file"
-          className="hidden"
-          accept=".jpg,.jpeg,.png,.pdf"
-          onChange={handleFileChange}
-        />
+          {/* Upload Area */}
+          {!document && (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="cursor-pointer rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-10 text-center transition hover:border-blue-500 hover:bg-blue-50"
+            >
 
-      </label>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl shadow-sm">
+                ⬆
+              </div>
 
+              <h3 className="font-semibold text-slate-800">
+                Upload your document
+              </h3>
 
-      {/* Selected File */}
-      {selectedFile && (
-        <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+              <p className="mt-2 text-sm text-slate-500">
+                Click here to choose a file
+              </p>
 
-          <p className="text-sm font-semibold text-[#334155]">
-            Selected Document
-          </p>
+              <p className="mt-3 text-xs text-slate-400">
+                Supported formats: JPG, PNG, PDF
+              </p>
 
-          <p className="mt-1 text-sm text-[#64748B]">
-            {selectedFile.name}
-          </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,application/pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
 
-          <p className="mt-1 text-xs text-[#94A3B8]">
-            {(selectedFile.size / 1024).toFixed(2)} KB
-          </p>
-
-        </div>
-      )}
-
-
-      {/* Backend Status */}
-      {verificationData && (
-        <div className="mt-4 rounded-lg bg-[#F8FAFC] p-3 text-xs text-[#64748B]">
-
-          Verification session active
-
-          {verificationId && (
-            <span className="ml-2 font-mono text-[#334155]">
-              #{verificationId.slice(0, 8)}
-            </span>
+            </div>
           )}
 
+          {/* Preview */}
+          {document && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+
+              <div className="mb-4 flex items-center justify-between">
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Document Preview
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    {document.name}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleRemove}
+                  className="text-sm font-semibold text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </button>
+
+              </div>
+
+              {/* Image Preview */}
+              {document.type.startsWith("image/") && preview && (
+                <div className="flex min-h-64 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
+                  <img
+                    src={preview}
+                    alt="Uploaded document"
+                    className="max-h-96 max-w-full rounded-lg object-contain"
+                  />
+                </div>
+              )}
+
+              {/* PDF Preview */}
+              {document.type === "application/pdf" && (
+                <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-slate-200 bg-white">
+                  <span className="text-5xl">📄</span>
+
+                  <p className="mt-3 font-semibold text-slate-700">
+                    PDF Document
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    Ready for verification
+                  </p>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* Processing */}
+          {status === "processing" && (
+            <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-6 text-center">
+
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-blue-200 border-t-blue-700"></div>
+
+              <h3 className="font-bold text-blue-900">
+                Verifying document...
+              </h3>
+
+              <p className="mt-1 text-sm text-blue-700">
+                Please wait while your document is being processed.
+              </p>
+
+            </div>
+          )}
+
+          {/* Verified */}
+          {status === "verified" && (
+            <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-6">
+
+              <div className="flex items-start gap-4">
+
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100 text-2xl">
+                  ✓
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-green-800">
+                    Document Verified
+                  </h3>
+
+                  <p className="mt-1 text-sm text-green-700">
+                    Your document has been successfully verified.
+                  </p>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-between">
+
+            <button
+              onClick={() => navigate("/profile")}
+              className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              ← Back
+            </button>
+
+            {status === "verified" ? (
+              <button
+                onClick={continueToFace}
+                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 active:scale-95"
+              >
+                Continue to Face Verification →
+              </button>
+            ) : (
+              <button
+                onClick={handleVerify}
+                disabled={!document || status === "processing"}
+                className="rounded-xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              >
+                {status === "processing"
+                  ? "Verifying..."
+                  : "Verify Document"}
+              </button>
+            )}
+
+          </div>
+
         </div>
-      )}
 
+        {/* Security Notice */}
+        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
 
-      {/* Verify Button */}
-      <div className="mt-5 flex justify-end">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+            🔒
+          </div>
 
-        <button
-          type="button"
-          onClick={handleVerifyDocument}
-          disabled={
-            loading ||
-            !selectedFile ||
-            verificationResult
-          }
-          className="inline-flex items-center justify-center rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading
-            ? "Verifying..."
-            : verificationResult
-              ? "Document Verified"
-              : "Verify Document"}
-        </button>
+          <div>
+            <h3 className="font-semibold text-blue-900">
+              Secure document processing
+            </h3>
 
-      </div>
+            <p className="mt-1 text-sm text-blue-700">
+              Your document is used only for verification purposes and is
+              processed through the secure verification workflow.
+            </p>
+          </div>
 
+        </div>
+
+      </main>
     </div>
   );
 }

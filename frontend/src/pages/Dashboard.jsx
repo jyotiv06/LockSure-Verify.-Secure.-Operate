@@ -1,14 +1,66 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import Navbar from "../components/Navbar";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import StatusBadge from "../components/StatusBadge";
-import { customer, verificationStatus } from "../data/mockData";
+
+import { customer as mockCustomer, verificationStatus } from "../data/mockData";
+import { getCurrentCustomer } from "../api/customer";
 
 function Dashboard() {
   const navigate = useNavigate();
 
-  const username = localStorage.getItem("username") || "Customer";
+  const [customer, setCustomer] = useState(mockCustomer);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      try {
+        const data = await getCurrentCustomer(token);
+
+        setCustomer({
+          ...mockCustomer,
+          ...data,
+          name: data.full_name || mockCustomer.name,
+          customerId: data.customer_id || mockCustomer.customerId,
+          accountStatus: data.account_status || mockCustomer.accountStatus,
+          email: data.email || "",
+        });
+      } catch (error) {
+        console.error("Unable to fetch customer:", error);
+
+        // Keep mock data if backend customer data is unavailable
+        setCustomer(mockCustomer);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCustomer();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent mx-auto"></div>
+
+          <p className="mt-4 text-gray-600">
+            Loading customer information...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -20,96 +72,178 @@ function Dashboard() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800">
-            Welcome back, {username}
+            Welcome back, {customer.name}
           </h2>
 
           <p className="text-gray-500 mt-2">
-            Manage your bank locker verification and operation.
+            Manage your locker verification and operations securely.
           </p>
         </div>
 
-        {/* Customer Information */}
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Account Overview */}
+        <div className="grid md:grid-cols-4 gap-5 mb-6">
 
           <Card>
-            <h3 className="text-xl font-semibold text-gray-800 mb-5">
-              Customer Information
-            </h3>
+            <p className="text-sm text-gray-500">
+              Account Status
+            </p>
 
-            <div className="space-y-3">
-
-              <p>
-                <span className="font-medium">Customer ID:</span>{" "}
-                {customer.customerId}
-              </p>
-
-              <p>
-                <span className="font-medium">Account Number:</span>{" "}
-                {customer.accountNumber}
-              </p>
-
-              <p>
-                <span className="font-medium">Locker Number:</span>{" "}
-                {customer.lockerNumber}
-              </p>
-
-              <p>
-                <span className="font-medium">Branch:</span>{" "}
-                {customer.branch}
-              </p>
-
-            </div>
+            <p className="text-xl font-bold text-green-600 mt-2">
+              {customer.accountStatus || "ACTIVE"}
+            </p>
           </Card>
 
-          {/* Verification Status */}
           <Card>
+            <p className="text-sm text-gray-500">
+              Customer ID
+            </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mb-5">
-              Verification Status
-            </h3>
+            <p className="text-xl font-bold text-gray-800 mt-2">
+              {customer.customerId}
+            </p>
+          </Card>
 
-            <div className="space-y-4">
+          <Card>
+            <p className="text-sm text-gray-500">
+              Locker Number
+            </p>
 
-              <div className="flex justify-between items-center">
-                <span>Profile Verification</span>
-                <StatusBadge status={verificationStatus.profile} />
-              </div>
+            <p className="text-xl font-bold text-gray-800 mt-2">
+              {customer.lockerNumber}
+            </p>
+          </Card>
 
-              <div className="flex justify-between items-center">
-                <span>Document Verification</span>
-                <StatusBadge status={verificationStatus.document} />
-              </div>
+          <Card>
+            <p className="text-sm text-gray-500">
+              Locker Status
+            </p>
 
-              <div className="flex justify-between items-center">
-                <span>Face Verification</span>
-                <StatusBadge status={verificationStatus.face} />
-              </div>
-
-            </div>
-
+            <p className="text-xl font-bold text-gray-800 mt-2">
+              {customer.lockerStatus || "OCCUPIED"}
+            </p>
           </Card>
 
         </div>
 
-        {/* Continue Verification */}
+        {/* Customer Information */}
+        <Card>
+
+          <h3 className="text-xl font-semibold text-gray-800 mb-5">
+            Customer Information
+          </h3>
+
+          <p className="text-gray-500 mb-6">
+            Your registered customer and locker details.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-5">
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Full Name
+              </p>
+
+              <p className="font-semibold text-gray-800 mt-1">
+                {customer.name}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Email Address
+              </p>
+
+              <p className="font-semibold text-gray-800 mt-1">
+                {customer.email || "Not available"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Customer ID
+              </p>
+
+              <p className="font-semibold text-gray-800 mt-1">
+                {customer.customerId}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Account Number
+              </p>
+
+              <p className="font-semibold text-gray-800 mt-1">
+                {customer.accountNumber}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Branch
+              </p>
+
+              <p className="font-semibold text-gray-800 mt-1">
+                {customer.branch}
+              </p>
+            </div>
+
+          </div>
+
+        </Card>
+
+        {/* Verification */}
+        <Card className="mt-6">
+
+          <h3 className="text-xl font-semibold text-gray-800 mb-5">
+            Verification
+          </h3>
+
+          <p className="text-gray-500 mb-6">
+            Current verification status.
+          </p>
+
+          <div className="space-y-4">
+
+            <div className="flex justify-between items-center">
+              <span>Profile Verification</span>
+              <StatusBadge status={verificationStatus.profile} />
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span>Document Verification</span>
+              <StatusBadge status={verificationStatus.document} />
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span>Face Verification</span>
+              <StatusBadge status={verificationStatus.face} />
+            </div>
+
+          </div>
+
+        </Card>
+
+        {/* Locker Operation */}
         <Card className="mt-6">
 
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
 
             <div>
               <h3 className="text-xl font-semibold text-gray-800">
-                Continue Verification
+                Ready to operate your locker?
               </h3>
 
               <p className="text-gray-500 mt-1">
-                Complete the remaining verification steps to operate your locker.
+                Complete identity, document and face verification before
+                proceeding with your locker operation.
               </p>
             </div>
 
             <Button
-              onClick={() => navigate("/profile")}
+              onClick={() => navigate("/document-verification")}
             >
-              Continue
+              Start Locker Operation →
             </Button>
 
           </div>
