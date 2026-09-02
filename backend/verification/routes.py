@@ -5,6 +5,11 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from database import SessionLocal
+from models.verification_session import VerificationSession
+from models.document_verification import DocumentVerification
+from models.face_verification import FaceVerification
+
 from .service import (
     start_verification,
     get_verification,
@@ -71,6 +76,7 @@ def _save_upload(
     except Exception as error:
         if path.exists():
             path.unlink()
+
         raise HTTPException(
             status_code=500,
             detail=f"Unable to save uploaded file: {str(error)}",
@@ -118,6 +124,102 @@ def start(request: VerificationStartRequest):
         )
 
     return result
+
+
+# IMPORTANT:
+# This must stay ABOVE /{verification_id}.
+# FastAPI will therefore match /verification/overview here
+# instead of treating "overview" as a verification_id.
+@router.get("/overview")
+def verification_overview():
+    """
+    Dashboard-wide verification statistics.
+
+    Returns:
+      - total verification sessions
+      - identity/final approval success rate
+      - document verification success rate
+      - face match success rate
+      - corresponding success counts
+    """
+    db = SessionLocal()
+
+    try:
+        total_verifications = (
+            db.query(VerificationSession).count()
+        )
+
+        identity_approved = (
+            db.query(VerificationSession)
+            .filter(
+                VerificationSession.status == "APPROVED"
+            )
+            .count()
+        )
+
+        total_documents = (
+            db.query(DocumentVerification).count()
+        )
+
+        documents_verified = (
+            db.query(DocumentVerification)
+            .filter(
+                DocumentVerification.result == "VERIFIED"
+            )
+            .count()
+        )
+
+        total_faces = (
+            db.query(FaceVerification).count()
+        )
+
+        faces_verified = (
+            db.query(FaceVerification)
+            .filter(
+                FaceVerification.result == "VERIFIED"
+            )
+            .count()
+        )
+
+        identity_success_rate = (
+            round(
+                (identity_approved / total_verifications) * 100,
+                2,
+            )
+            if total_verifications > 0
+            else 0.0
+        )
+
+        document_success_rate = (
+            round(
+                (documents_verified / total_documents) * 100,
+                2,
+            )
+            if total_documents > 0
+            else 0.0
+        )
+
+        face_success_rate = (
+            round(
+                (faces_verified / total_faces) * 100,
+                2,
+            )
+            if total_faces > 0
+            else 0.0
+        )
+
+        return {
+            "total_verifications": total_verifications,
+            "identity_verification_success_rate": identity_success_rate,
+            "document_verification_success_rate": document_success_rate,
+            "face_match_success_rate": face_success_rate,
+            "identity_approved": identity_approved,
+            "documents_verified": documents_verified,
+            "faces_verified": faces_verified,
+        }
+
+    finally:
+        db.close()
 
 
 @router.get("/{verification_id}")
@@ -176,7 +278,7 @@ async def document_upload(
     )
 
     # Do not pass fake document_match=True.
-    # The service executes Samiksha's real OCR path.
+    # The service executes the real OCR path.
     result = process_document(
         verification_id=verification_id,
         image_path=saved_path,
