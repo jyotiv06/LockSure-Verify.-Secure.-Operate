@@ -3,11 +3,11 @@ import {
   CheckCircle2,
   Clock3,
   ShieldAlert,
-  XCircle,
   FileCheck2,
   ScanFace,
   CircleCheck,
   CircleX,
+  XCircle,
 } from "lucide-react";
 
 import {
@@ -564,12 +564,6 @@ function CustomerVerification() {
           response.data.state
         );
 
-
-        await fetchVerification(
-          verificationId
-        );
-
-
       } catch (error) {
 
         console.error(
@@ -612,14 +606,16 @@ function CustomerVerification() {
       return;
     }
 
-
     navigate(
-      `/officer/lockers?verification=${verificationId}&status=approved`
+      `/officer/lockers?verification=${verificationId}&status=approved`,
+      {
+        state: {
+          customer: displayData,
+        },
+      }
     );
 
   };
-
-
   /*
     =================================
     MERGE CUSTOMER + VERIFICATION DATA
@@ -703,9 +699,19 @@ function CustomerVerification() {
       verificationData?.branch_name ||
       null,
 
+
+    locker_location:
+      customerData?.locker_location ||
+      verificationData?.locker_location ||
+      customerData?.location ||
+      verificationData?.location ||
+      null,
   };
 
-
+  console.log(
+    "DISPLAY DATA RISK SCORE:",
+    displayData?.risk_score
+  );
   /*
     =================================
     STATUS
@@ -930,8 +936,8 @@ function CustomerVerification() {
 
                       {verificationId
                         ? verificationId
-                            .slice(0, 8)
-                            .toUpperCase()
+                          .slice(0, 8)
+                          .toUpperCase()
                         : "STARTING"}
 
                     </p>
@@ -1012,13 +1018,12 @@ function CustomerVerification() {
                     />
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        documentStatus === "Verified"
-                          ? "bg-green-50 text-green-700"
-                          : documentStatus === "Failed"
-                            ? "bg-red-50 text-red-700"
-                            : "bg-amber-50 text-amber-700"
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatus === "Verified"
+                        ? "bg-green-50 text-green-700"
+                        : documentStatus === "Failed"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-amber-50 text-amber-700"
+                        }`}
                     >
                       {documentStatus}
                     </span>
@@ -1093,13 +1098,12 @@ function CustomerVerification() {
                     />
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        faceStatus === "Verified"
-                          ? "bg-green-50 text-green-700"
-                          : faceStatus === "Failed"
-                            ? "bg-red-50 text-red-700"
-                            : "bg-amber-50 text-amber-700"
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${faceStatus === "Verified"
+                        ? "bg-green-50 text-green-700"
+                        : faceStatus === "Failed"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-amber-50 text-amber-700"
+                        }`}
                     >
                       {faceStatus}
                     </span>
@@ -1113,6 +1117,15 @@ function CustomerVerification() {
 
                   <p className="mt-1 text-xs text-[#64748B]">
                     Confirm whether the customer's face matches the identity.
+                  </p>
+
+                  <p className="mt-3 text-sm font-semibold text-[#111827]">
+                    Match Score:{" "}
+                    <span className="text-[#2563EB]">
+                      {displayData?.face_match_score != null
+                        ? `${Number(displayData.face_match_score).toFixed(1)}%`
+                        : "Pending"}
+                    </span>
                   </p>
 
 
@@ -1321,7 +1334,7 @@ function CustomerVerification() {
                   disabled={
                     actionLoading ||
                     verificationData?.state !==
-                      "APPROVED"
+                    "APPROVED"
                   }
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
