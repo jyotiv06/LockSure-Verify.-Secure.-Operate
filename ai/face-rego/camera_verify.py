@@ -53,7 +53,7 @@ def run_complete_face_verification(
 
     print()
     print("=" * 70)
-    print("LOCKSURE - DOCUMENT + FACE VERIFICATION")
+    print("LOCKSURE - FACE VERIFICATION")
     print("=" * 70)
 
     # ========================================================
@@ -61,7 +61,7 @@ def run_complete_face_verification(
     # ========================================================
 
     print()
-    print("[1/4] Processing customer document...")
+   # print("[1/4] Processing customer document...")
 
     document_result = verify_document(
         document_path,
@@ -77,12 +77,12 @@ def run_complete_face_verification(
         return
 
     print()
-    print("Document processing result:")
+    #print("Document processing result:")
 
-    print(
-        "Document verified:",
-        document_result.get("verified")
-    )
+   # print(
+      #  "Document verified:",
+      #  document_result.get("verified")
+    #)
 
     # --------------------------------------------------------
     # IMPORTANT:
@@ -127,7 +127,7 @@ def run_complete_face_verification(
     # ========================================================
 
     print()
-    print("[2/4] Capturing live customer face...")
+    #print("[2/4] Capturing live customer face...")
 
     captured = capture_face(
         CAPTURED_IMAGE
@@ -146,19 +146,19 @@ def run_complete_face_verification(
     # ========================================================
 
     print()
-    print("[3/4] Comparing document face with live face...")
+    #print("[3/4] Comparing document face with live face...")
 
     print()
-    print("REFERENCE IMAGE:")
+    print("Document photo path:")
     print(
         document_photo_path
     )
 
     print()
-    print("LIVE IMAGE:")
-    print(
-        CAPTURED_IMAGE
-    )
+    #print("LIVE IMAGE:")
+    #print(
+       # CAPTURED_IMAGE
+   # )
 
     face_result = verify_face(
         reference_image=document_photo_path,
@@ -183,7 +183,7 @@ def run_complete_face_verification(
     # ========================================================
 
     print()
-    print("[4/4] Testing face verification API...")
+    #print("[4/4] Testing face verification API...")
 
     try:
 
@@ -221,23 +221,23 @@ def run_complete_face_verification(
             api_result = response.json()
 
             print()
-            print("API RESULT:")
+           # print("API RESULT:")
 
-            print(
-                api_result
-            )
+           # print(
+               # api_result
+            #)
 
         else:
 
             print()
-            print(
-                "API returned status:",
-                response.status_code
-            )
+            #print(
+               # "API returned status:",
+               # response.status_code
+            #)
 
-            print(
-                response.text
-            )
+           # print(
+             #   response.text
+            #)
 
     except requests.exceptions.ConnectionError:
 
@@ -262,46 +262,46 @@ def run_complete_face_verification(
     # FINAL RESULT
     # ========================================================
 
-    print()
-    print("=" * 70)
-    print("FINAL FACE VERIFICATION RESULT")
-    print("=" * 70)
+   # print()
+   # print("=" * 70)
+   # print("FINAL FACE VERIFICATION RESULT")
+   # print("=" * 70)
 
-    print(
-        "Reference:",
-        document_photo_path
-    )
+   # print(
+      ##  "Document photo path:",
+       # document_photo_path
+    #)
 
-    print(
-    "Document photo extraction error:",
-    document_result.get("photo_error")
-    )
+    #print(
+    #"Document photo extraction error:",
+    #document_result.get("photo_error")
+    #)
 
-    print()
-    print("COMPLETE DOCUMENT RESULT:")
-    print(document_result)
+    #print()
+    #print("COMPLETE DOCUMENT RESULT:")
+    #print(document_result)
 
-    print(
-        "Live capture:",
-        CAPTURED_IMAGE
-    )
+   # print(
+      #  "Live capture:",
+       # CAPTURED_IMAGE
+    #)
 
-    print(
-        "Matched:",
-        face_result.get("matched")
-    )
+   # print(
+    #    "Matched:",
+    #    face_result.get("matched")
+    #)
 
-    print(
-        "Confidence:",
-        face_result.get("confidence")
-    )
+    #print(
+      #  "Confidence:",
+     #   face_result.get("confidence")
+    #)
 
-    print(
-        "Status:",
-        face_result.get("status")
-    )
+    #print(
+    #    "Status:",
+   #     face_result.get("status")
+   # )
 
-    print("=" * 70)
+    #print("=" * 70)
 
 
 # ============================================================
