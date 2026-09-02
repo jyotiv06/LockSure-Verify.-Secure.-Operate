@@ -7,7 +7,11 @@ from database import Base
 class Locker(Base):
     __tablename__ = "lockers"
 
-    locker_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    locker_id = Column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True
+    )
 
     locker_number = Column(
         String(20),
