@@ -26,82 +26,6 @@ function SecurityAlerts() {
 
 
   // =========================================================
-  // FETCH SECURITY ALERTS
-  // =========================================================
-
-  useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch(API_URL);
-
-        if (!response.ok) {
-          throw new Error(
-            "Failed to load security alerts."
-          );
-        }
-
-        const data = await response.json();
-
-        // Convert backend response into UI structure
-        const formattedAlerts = data.map((alert) => ({
-          id: alert.alert_id,
-
-          severity: alert.severity,
-
-          title:
-            alert.severity === "HIGH"
-              ? "High Risk Security Alert"
-              : "Verification Requires Review",
-
-          description: alert.incident_reason,
-
-          customer:
-            alert.customer_name || "Unknown Customer",
-
-          customerId:
-            alert.customer_id || "N/A",
-
-          lockerId:
-            alert.locker_number ||
-            alert.locker_id ||
-            "N/A",
-
-          recommendedAction:
-            alert.recommended_action,
-
-          verificationId:
-            alert.verification_id,
-
-          timestamp:
-            alert.timestamp,
-
-          time: formatTime(alert.timestamp),
-        }));
-
-        setAlerts(formattedAlerts);
-      } catch (error) {
-        console.error(
-          "Security Alerts API Error:",
-          error
-        );
-
-        setError(
-          error.message ||
-            "Unable to load security alerts."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAlerts();
-  }, []);
-
-
-  // =========================================================
   // FORMAT TIME
   // =========================================================
 
@@ -158,15 +82,123 @@ function SecurityAlerts() {
 
 
   // =========================================================
+  // FETCH SECURITY ALERTS
+  // =========================================================
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(API_URL);
+
+        if (!response.ok) {
+          throw new Error(
+            "Failed to load security alerts."
+          );
+        }
+
+        const data = await response.json();
+
+
+        // =====================================================
+        // HANDLE DIFFERENT BACKEND RESPONSE STRUCTURES
+        // =====================================================
+
+        const alertsData = Array.isArray(data)
+          ? data
+          : data.alerts || [];
+
+
+        // =====================================================
+        // CONVERT BACKEND RESPONSE INTO UI STRUCTURE
+        // =====================================================
+
+        const formattedAlerts =
+          alertsData.map((alert) => ({
+            id: alert.alert_id,
+
+            severity: alert.severity,
+
+            title:
+              alert.severity === "HIGH"
+                ? "High Risk Security Alert"
+                : "Verification Requires Review",
+
+            description:
+              alert.incident_reason ||
+              "Security event requires review.",
+
+            customer:
+              alert.customer_name ||
+              "Unknown Customer",
+
+            customerId:
+              alert.customer_id ||
+              "N/A",
+
+            lockerId:
+              alert.locker_number ||
+              alert.locker_id ||
+              "N/A",
+
+            recommendedAction:
+              alert.recommended_action,
+
+            verificationId:
+              alert.verification_id,
+
+            timestamp:
+              alert.timestamp,
+
+            time:
+              formatTime(
+                alert.timestamp
+              ),
+          }));
+
+
+        setAlerts(formattedAlerts);
+
+      } catch (error) {
+
+        console.error(
+          "Security Alerts API Error:",
+          error
+        );
+
+        setError(
+          error.message ||
+          "Unable to load security alerts."
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+    };
+
+
+    fetchAlerts();
+
+  }, []);
+
+
+  // =========================================================
   // RESOLVE ALERT
   // =========================================================
 
   const resolveAlert = (alert) => {
+
     setAlerts((previousAlerts) =>
       previousAlerts.filter(
-        (item) => item.id !== alert.id
+        (item) =>
+          item.id !== alert.id
       )
     );
+
 
     setResolvedAlerts(
       (previousAlerts) => [
@@ -185,6 +217,7 @@ function SecurityAlerts() {
   // =========================================================
 
   const dismissAlert = (alertId) => {
+
     setAlerts((previousAlerts) =>
       previousAlerts.filter(
         (alert) =>
@@ -199,6 +232,7 @@ function SecurityAlerts() {
   // =========================================================
 
   const getAlertStyle = (severity) => {
+
     if (severity === "HIGH") {
       return {
         icon: ShieldAlert,
@@ -206,13 +240,17 @@ function SecurityAlerts() {
         badge:
           "bg-red-50 text-red-600 border-red-200",
 
-        iconBg: "bg-red-50",
+        iconBg:
+          "bg-red-50",
 
-        iconColor: "text-red-500",
+        iconColor:
+          "text-red-500",
 
-        border: "border-red-100",
+        border:
+          "border-red-100",
       };
     }
+
 
     if (severity === "MEDIUM") {
       return {
@@ -221,13 +259,17 @@ function SecurityAlerts() {
         badge:
           "bg-amber-50 text-amber-700 border-amber-200",
 
-        iconBg: "bg-amber-50",
+        iconBg:
+          "bg-amber-50",
 
-        iconColor: "text-amber-500",
+        iconColor:
+          "text-amber-500",
 
-        border: "border-amber-100",
+        border:
+          "border-amber-100",
       };
     }
+
 
     return {
       icon: Info,
@@ -235,11 +277,14 @@ function SecurityAlerts() {
       badge:
         "bg-blue-50 text-blue-600 border-blue-200",
 
-      iconBg: "bg-blue-50",
+      iconBg:
+        "bg-blue-50",
 
-      iconColor: "text-blue-500",
+      iconColor:
+        "text-blue-500",
 
-      border: "border-blue-100",
+      border:
+        "border-blue-100",
     };
   };
 
@@ -294,6 +339,7 @@ function SecurityAlerts() {
       {/* ALERT STATISTICS */}
 
       <div className="grid gap-4 sm:grid-cols-3">
+
 
         {/* HIGH */}
 
@@ -477,6 +523,7 @@ function SecurityAlerts() {
               const Icon =
                 style.icon;
 
+
               return (
 
                 <div
@@ -533,8 +580,8 @@ function SecurityAlerts() {
 
                           <p className="mt-2 text-xs font-semibold text-[#475569]">
 
-                            Recommended Action:
-                            {" "}
+                            Recommended Action:{" "}
+
                             {alert.recommendedAction}
 
                           </p>
@@ -543,6 +590,7 @@ function SecurityAlerts() {
 
 
                         <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-[#64748B]">
+
 
                           <div className="flex items-center gap-1.5">
 
@@ -554,15 +602,13 @@ function SecurityAlerts() {
 
 
                           <span>
-                            Customer ID:
-                            {" "}
+                            Customer ID:{" "}
                             {alert.customerId}
                           </span>
 
 
                           <span>
-                            Locker:
-                            {" "}
+                            Locker:{" "}
                             {alert.lockerId}
                           </span>
 
@@ -684,8 +730,8 @@ function SecurityAlerts() {
 
                   <span className="text-xs font-medium text-green-600">
 
-                    Resolved
-                    {" "}
+                    Resolved{" "}
+
                     {alert.resolvedAt}
 
                   </span>

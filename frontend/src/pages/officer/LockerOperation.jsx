@@ -102,6 +102,11 @@ function LockerOperations() {
       );
       return;
     }
+    console.log("OPEN LOCKER VALUES:", {
+      customerId,
+      lockerId,
+      verificationId,
+    });
 
     try {
       setLoading(true);
@@ -111,6 +116,7 @@ function LockerOperations() {
         {
           customer_id: Number(customerId),
           verification_id: String(verificationId),
+          officer_id: 1,
         }
       );
 
@@ -162,6 +168,7 @@ function LockerOperations() {
         {
           customer_id: Number(customerId),
           verification_id: String(verificationId),
+          officer_id: 1,
         }
       );
 
@@ -272,11 +279,10 @@ function LockerOperations() {
             {/* Locker Icon */}
 
             <div
-              className={`flex h-28 w-28 items-center justify-center rounded-3xl ${
-                lockerOpen
-                  ? "bg-green-50"
-                  : "bg-red-50"
-              }`}
+              className={`flex h-28 w-28 items-center justify-center rounded-3xl ${lockerOpen
+                ? "bg-green-50"
+                : "bg-red-50"
+                }`}
             >
 
               {lockerOpen ? (
@@ -301,11 +307,10 @@ function LockerOperations() {
             </p>
 
             <h2
-              className={`mt-2 text-3xl font-bold ${
-                lockerOpen
-                  ? "text-green-600"
-                  : "text-red-500"
-              }`}
+              className={`mt-2 text-3xl font-bold ${lockerOpen
+                ? "text-green-600"
+                : "text-red-500"
+                }`}
             >
               {lockerOpen ? "OPEN" : "LOCKED"}
             </h2>
