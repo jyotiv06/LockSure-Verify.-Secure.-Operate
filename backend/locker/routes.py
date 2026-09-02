@@ -106,6 +106,19 @@ def locker_status(locker_id: int):
         "locker_id": locker_id,
         "locker_status": get_locker_status(locker_id)
     }
+# ============================================================
+# ALL RECENT LOCKER OPERATIONS
+# ============================================================
+
+@router.get("/operations")
+def all_locker_operations():
+    """
+    Get recent operations across all lockers.
+    """
+
+    return {
+        "operations": get_operations()
+    }
 
 
 # ============================================================
@@ -115,7 +128,7 @@ def locker_status(locker_id: int):
 @router.get("/{locker_id}/operations")
 def locker_operations(locker_id: int):
     """
-    Get all locker operations.
+    Get all locker operations for a specific locker.
     """
 
     return {

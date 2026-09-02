@@ -1,4 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 // Home / Portal Selection
 import PortalSelection from "./pages/PortalSelection";
@@ -22,13 +27,17 @@ import LockerOperation from "./pages/officer/LockerOperation";
 import SecurityAlerts from "./pages/officer/SecurityAlerts";
 import AuditHistory from "./pages/officer/AuditHistory";
 
+
 function App() {
+
   return (
+
     <BrowserRouter>
+
       <Routes>
 
         {/* ========================= */}
-        {/* HOME / PORTAL SELECTION   */}
+        {/* HOME / PORTAL SELECTION */}
         {/* ========================= */}
 
         <Route
@@ -36,14 +45,10 @@ function App() {
           element={<PortalSelection />}
         />
 
-        {/* ========================= */}
-        {/* CUSTOMER AUTHENTICATION   */}
-        {/* ========================= */}
 
-        <Route
-          path="/customer/login"
-          element={<Login />}
-        />
+        {/* ========================= */}
+        {/* CUSTOMER AUTHENTICATION */}
+        {/* ========================= */}
 
         <Route
           path="/login"
@@ -55,8 +60,14 @@ function App() {
           element={<Register />}
         />
 
+        <Route
+          path="/customer/login"
+          element={<Login />}
+        />
+
+
         {/* ========================= */}
-        {/* CUSTOMER PORTAL            */}
+        {/* CUSTOMER PORTAL */}
         {/* ========================= */}
 
         <Route
@@ -69,8 +80,9 @@ function App() {
           element={<Profile />}
         />
 
+
         {/* ========================= */}
-        {/* VERIFICATION FLOW          */}
+        {/* CUSTOMER VERIFICATION */}
         {/* ========================= */}
 
         <Route
@@ -93,8 +105,9 @@ function App() {
           element={<LockerStatus />}
         />
 
+
         {/* ========================= */}
-        {/* OFFICER PORTAL             */}
+        {/* OFFICER PORTAL */}
         {/* ========================= */}
 
         <Route
@@ -142,8 +155,9 @@ function App() {
           element={<AuditHistory />}
         />
 
+
         {/* ========================= */}
-        {/* UNKNOWN ROUTES             */}
+        {/* UNKNOWN ROUTES */}
         {/* ========================= */}
 
         <Route
@@ -157,8 +171,12 @@ function App() {
         />
 
       </Routes>
+
     </BrowserRouter>
+
   );
+
 }
+
 
 export default App;

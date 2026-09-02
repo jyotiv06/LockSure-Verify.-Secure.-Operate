@@ -73,6 +73,10 @@ def _audit(
         pass
 
 
+# =========================================================
+# START VERIFICATION
+# =========================================================
+
 def start_verification(
     customer_id: int,
     locker_id: str,
@@ -85,6 +89,7 @@ def start_verification(
     db: Session = get_db()
 
     try:
+
         # API accepts business locker number such as "L001".
         locker = (
             db.query(Locker)
@@ -97,6 +102,7 @@ def start_verification(
         if not locker:
             return None
 
+
         session = VerificationSession(
             customer_id=customer_id,
             locker_id=locker.locker_id,
@@ -107,6 +113,8 @@ def start_verification(
         db.commit()
         db.refresh(session)
 
+
+        # Store temporary verification context.
         verification_contexts[str(session.session_id)] = {
             "account_status": account_status.upper(),
             "failed_attempts": failed_attempts,
@@ -114,12 +122,14 @@ def start_verification(
             "customer_data": customer_data or {},
         }
 
+
         _audit(
             session,
             locker.locker_number,
             "VERIFICATION_STARTED",
             f"Verification {session.session_id} started.",
         )
+
 
         return {
             "verification_id": str(session.session_id),
@@ -129,6 +139,9 @@ def start_verification(
             "document_match": None,
             "face_match": None,
             "risk_decision": None,
+            "risk_score": None,
+            "risk_level": None,
+            "reason": None,
             "created_at": (
                 session.started_at.isoformat()
                 if session.started_at
@@ -145,15 +158,21 @@ def start_verification(
         db.close()
 
 
+# =========================================================
+# GET VERIFICATION
+# =========================================================
+
 def get_verification(verification_id: str):
 
     db: Session = get_db()
 
     try:
+
         try:
             session_id = int(verification_id)
         except ValueError:
             return None
+
 
         session = (
             db.query(VerificationSession)
@@ -166,6 +185,7 @@ def get_verification(verification_id: str):
         if not session:
             return None
 
+
         locker = (
             db.query(Locker)
             .filter(
@@ -173,6 +193,7 @@ def get_verification(verification_id: str):
             )
             .first()
         )
+
 
         document = (
             db.query(DocumentVerification)
@@ -186,6 +207,7 @@ def get_verification(verification_id: str):
             .first()
         )
 
+
         face = (
             db.query(FaceVerification)
             .filter(
@@ -197,6 +219,7 @@ def get_verification(verification_id: str):
             )
             .first()
         )
+
 
         risk = (
             db.query(RiskAssessment)
@@ -210,39 +233,87 @@ def get_verification(verification_id: str):
             .first()
         )
 
+
+        document_match = (
+            document.result == "PASSED"
+            if document
+            else None
+        )
+
+
+        face_match = (
+            face.result == "PASSED"
+            if face
+            else None
+        )
+
+
         return {
             "verification_id": str(session.session_id),
+
             "customer_id": session.customer_id,
+
             "locker_id": (
                 locker.locker_number
                 if locker
                 else None
             ),
+
             "state": (
                 "INITIATED"
                 if session.status == "IN_PROGRESS"
                 else session.status
             ),
-            "document_match": (
-                document.result == "PASSED"
-                if document
+
+            "document_match": document_match,
+
+            "document_match_score": (
+                float(document.match_score)
+                if document and document.match_score is not None
                 else None
             ),
-            "face_match": (
-                face.result == "PASSED"
-                if face
+
+            "face_match": face_match,
+
+            "face_match_score": (
+                float(face.match_score)
+                if face and face.match_score is not None
                 else None
             ),
+
             "risk_decision": (
                 risk.risk_level
                 if risk
                 else None
             ),
+
+            # IMPORTANT:
+            # These fields were missing before.
+            # Your frontend RiskAssessment needs them.
+            "risk_score": (
+                float(risk.risk_score)
+                if risk and risk.risk_score is not None
+                else None
+            ),
+
+            "risk_level": (
+                risk.risk_level
+                if risk
+                else None
+            ),
+
+            "reason": (
+                risk.reason
+                if risk
+                else None
+            ),
+
             "created_at": (
                 session.started_at.isoformat()
                 if session.started_at
                 else None
             ),
+
             "updated_at": (
                 session.completed_at.isoformat()
                 if session.completed_at
@@ -258,6 +329,10 @@ def get_verification(verification_id: str):
         db.close()
 
 
+# =========================================================
+# DOCUMENT VERIFICATION
+# =========================================================
+
 def process_document(
     verification_id: str,
     document_match: bool | None = None,
@@ -268,6 +343,7 @@ def process_document(
     db: Session = get_db()
 
     try:
+
         session = (
             db.query(VerificationSession)
             .filter(
@@ -279,6 +355,7 @@ def process_document(
 
         if not session:
             return None
+
 
         if session.status not in [
             "IN_PROGRESS",
@@ -292,19 +369,22 @@ def process_document(
                 ),
             )
 
+
         context = verification_contexts.get(
             verification_id,
             {},
         )
+
 
         data = (
             customer_data
             or context.get("customer_data", {})
         )
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # REAL OCR MODE
-        # -------------------------------
+        # -------------------------------------------------
 
         if image_path:
 
@@ -330,30 +410,38 @@ def process_document(
                     ),
                 )
 
+
             try:
+
                 result = verify_document_real(
                     image_path,
                     data,
                 )
+
             except Exception as error:
+
                 raise HTTPException(
                     status_code=500,
                     detail=f"Document AI error: {str(error)}",
                 )
 
+
             if not isinstance(result, dict):
+
                 raise HTTPException(
                     status_code=500,
                     detail="OCR returned an invalid result.",
                 )
 
+
             document_match = bool(
                 result.get("verified", False)
             )
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # MANUAL TEST MODE
-        # -------------------------------
+        # -------------------------------------------------
 
         elif document_match is not None:
 
@@ -362,7 +450,9 @@ def process_document(
                 "source": "manual_test_input",
             }
 
+
         else:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -371,43 +461,65 @@ def process_document(
                 ),
             )
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # FIND OR CREATE CUSTOMER DOCUMENT
-        # -------------------------------
+        # -------------------------------------------------
 
         document = (
             db.query(Document)
-            .filter(Document.customer_id == session.customer_id)
-            .order_by(Document.document_id.desc())
+            .filter(
+                Document.customer_id == session.customer_id
+            )
+            .order_by(
+                Document.document_id.desc()
+            )
             .first()
         )
 
-        # Fresh customers may not have a document row yet.
-        # Create a document record automatically for this verification.
+
         if not document:
+
             document = Document(
                 customer_id=session.customer_id,
                 document_type="IDENTITY_DOCUMENT",
-                document_number=f"VERIFICATION-{session.session_id}",
+                document_number=(
+                    f"VERIFICATION-{session.session_id}"
+                ),
                 document_reference=image_path,
                 verified=False,
             )
+
             db.add(document)
             db.flush()
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # SAVE DOCUMENT VERIFICATION
-        # -------------------------------
+        # -------------------------------------------------
 
         verification = DocumentVerification(
             session_id=session.session_id,
             document_id=document.document_id,
-            match_score=100.00 if document_match else 0.00,
-            result="PASSED" if document_match else "FAILED",
+            match_score=(
+                100.00
+                if document_match
+                else 0.00
+            ),
+            result=(
+                "PASSED"
+                if document_match
+                else "FAILED"
+            ),
         )
 
+
         db.add(verification)
-        document.verified = bool(document_match)
+
+        document.verified = bool(
+            document_match
+        )
+
 
         session.status = (
             "DOCUMENT_VERIFIED"
@@ -415,27 +527,50 @@ def process_document(
             else "DOCUMENT_FAILED"
         )
 
+
         db.commit()
+
 
         locker = (
             db.query(Locker)
-            .filter(Locker.locker_id == session.locker_id)
+            .filter(
+                Locker.locker_id == session.locker_id
+            )
             .first()
         )
 
+
         _audit(
             session,
-            locker.locker_number if locker else None,
-            "DOCUMENT_VERIFIED" if document_match else "DOCUMENT_FAILED",
-            "Document verification passed."
-            if document_match
-            else "Document verification failed.",
+            (
+                locker.locker_number
+                if locker
+                else None
+            ),
+            (
+                "DOCUMENT_VERIFIED"
+                if document_match
+                else "DOCUMENT_FAILED"
+            ),
+            (
+                "Document verification passed."
+                if document_match
+                else "Document verification failed."
+            ),
         )
 
-        return get_verification(verification_id)
+
+        return get_verification(
+            verification_id
+        )
 
     finally:
         db.close()
+
+
+# =========================================================
+# FACE VERIFICATION
+# =========================================================
 
 def process_face(
     verification_id: str,
@@ -447,6 +582,7 @@ def process_face(
     db: Session = get_db()
 
     try:
+
         session = (
             db.query(VerificationSession)
             .filter(
@@ -459,7 +595,9 @@ def process_face(
         if not session:
             return None
 
+
         if session.status != "DOCUMENT_VERIFIED":
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -468,24 +606,30 @@ def process_face(
                 ),
             )
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # REAL FACE VERIFICATION
-        # -------------------------------
+        # -------------------------------------------------
 
         if reference_image and live_image:
 
             try:
+
                 result = verify_face_real(
                     reference_image,
                     live_image,
                 )
+
             except Exception as error:
+
                 raise HTTPException(
                     status_code=500,
                     detail=f"Face AI error: {str(error)}",
                 )
 
+
             if not isinstance(result, dict):
+
                 raise HTTPException(
                     status_code=500,
                     detail=(
@@ -494,14 +638,15 @@ def process_face(
                     ),
                 )
 
-            # Dhanashree integration returns "matched".
+
             face_match = bool(
                 result.get("matched", False)
             )
 
-        # -------------------------------
+
+        # -------------------------------------------------
         # MANUAL TEST MODE
-        # -------------------------------
+        # -------------------------------------------------
 
         elif face_match is not None:
 
@@ -510,7 +655,9 @@ def process_face(
                 "source": "manual_test_input",
             }
 
+
         else:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -519,9 +666,10 @@ def process_face(
                 ),
             )
 
-        # -------------------------------
-        # SAVE RESULT
-        # -------------------------------
+
+        # -------------------------------------------------
+        # SAVE FACE RESULT
+        # -------------------------------------------------
 
         verification = FaceVerification(
             session_id=session.session_id,
@@ -538,7 +686,9 @@ def process_face(
             ),
         )
 
+
         db.add(verification)
+
 
         session.status = (
             "FACE_VERIFIED"
@@ -546,7 +696,9 @@ def process_face(
             else "FACE_FAILED"
         )
 
+
         db.commit()
+
 
         locker = (
             db.query(Locker)
@@ -556,9 +708,14 @@ def process_face(
             .first()
         )
 
+
         _audit(
             session,
-            locker.locker_number if locker else None,
+            (
+                locker.locker_number
+                if locker
+                else None
+            ),
             (
                 "FACE_VERIFIED"
                 if face_match
@@ -571,13 +728,23 @@ def process_face(
             ),
         )
 
-        return get_verification(verification_id)
+
+        return get_verification(
+            verification_id
+        )
 
     finally:
         db.close()
 
 
-def finalize_verification(verification_id: str):
+# =========================================================
+# FINALIZE VERIFICATION
+# =========================================================
+
+def finalize_verification(
+    verification_id: str
+):
+
     db: Session = get_db()
 
     try:
@@ -585,23 +752,26 @@ def finalize_verification(verification_id: str):
         session = (
             db.query(VerificationSession)
             .filter(
-                VerificationSession.session_id == int(verification_id)
+                VerificationSession.session_id
+                == int(verification_id)
             )
             .first()
         )
 
+
         if not session:
             return None
 
-        # --------------------------------------------------------
-        # GET ACTUAL VERIFICATION RESULTS
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
+        # GET ACTUAL DOCUMENT RESULT
+        # -------------------------------------------------
 
         document = (
             db.query(DocumentVerification)
             .filter(
-                DocumentVerification.session_id ==
-                session.session_id
+                DocumentVerification.session_id
+                == session.session_id
             )
             .order_by(
                 DocumentVerification
@@ -612,15 +782,15 @@ def finalize_verification(verification_id: str):
         )
 
 
-        # =====================================
-        # GET LATEST FACE VERIFICATION
-        # =====================================
+        # -------------------------------------------------
+        # GET ACTUAL FACE RESULT
+        # -------------------------------------------------
 
         face = (
             db.query(FaceVerification)
             .filter(
-                FaceVerification.session_id ==
-                session.session_id
+                FaceVerification.session_id
+                == session.session_id
             )
             .order_by(
                 FaceVerification
@@ -630,10 +800,6 @@ def finalize_verification(verification_id: str):
             .first()
         )
 
-
-        # =====================================
-        # DETERMINE VERIFICATION RESULTS
-        # =====================================
 
         document_result = (
             document.result
@@ -658,27 +824,31 @@ def finalize_verification(verification_id: str):
             face_result == "PASSED"
         )
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # VALIDATE ACTUAL RESULTS
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         if not document_match or not face_match:
+
             raise HTTPException(
                 status_code=400,
                 detail=(
                     "Finalization is allowed only after "
-                    "document and face verification."
+                    "document and face verification pass."
                 ),
             )
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # GET RISK / SECURITY CONTEXT
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         context = verification_contexts.get(
             verification_id,
             {},
         )
+
 
         risk_input = {
             "face_match": face_match,
@@ -693,34 +863,42 @@ def finalize_verification(verification_id: str):
             ),
         }
 
+
         suspicious_input = {
             **risk_input,
+
             "access_attempts_last_hour": context.get(
                 "access_attempts_last_hour",
                 0,
             ),
         }
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # START RISK ASSESSMENT
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         session.status = "RISK_ASSESSMENT"
+
         db.commit()
+
 
         locker = (
             db.query(Locker)
             .filter(
-                Locker.locker_id == session.locker_id
+                Locker.locker_id
+                == session.locker_id
             )
             .first()
         )
+
 
         locker_number = (
             locker.locker_number
             if locker
             else None
         )
+
 
         _audit(
             session,
@@ -729,36 +907,51 @@ def finalize_verification(verification_id: str):
             "Risk assessment started.",
         )
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # RISK ENGINE
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         try:
+
             risk_result = calculate_risk_real(
                 risk_input
             )
+
         except Exception as error:
+
             raise HTTPException(
                 status_code=500,
-                detail=f"Risk engine error: {str(error)}",
+                detail=(
+                    f"Risk engine error: {str(error)}"
+                ),
             )
 
-        if not isinstance(risk_result, dict):
+
+        if not isinstance(
+            risk_result,
+            dict,
+        ):
+
             raise HTTPException(
                 status_code=500,
-                detail="Risk engine returned an invalid result.",
+                detail=(
+                    "Risk engine returned "
+                    "an invalid result."
+                ),
             )
 
-        # --------------------------------------------------------
-        # EXTRACT RISK RESULT
-        # --------------------------------------------------------
 
         risk_score = float(
             risk_result.get(
                 "risk_score",
-                risk_result.get("score", 10.0),
+                risk_result.get(
+                    "score",
+                    10.0,
+                ),
             )
         )
+
 
         risk_level = str(
             risk_result.get(
@@ -767,29 +960,44 @@ def finalize_verification(verification_id: str):
             )
         ).upper()
 
+
         reason = risk_result.get(
             "reason",
-            "Document and face verification passed.",
+            (
+                "Document and face verification "
+                "passed."
+            ),
         )
 
-        # --------------------------------------------------------
-        # SUSPICIOUS ACTIVITY
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
+        # SUSPICIOUS ACTIVITY ENGINE
+        # -------------------------------------------------
 
         try:
+
             suspicious_result = detect_suspicious_real(
                 suspicious_input
             )
+
         except Exception as error:
+
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    f"Suspicious activity engine error: {str(error)}"
+                    "Suspicious activity engine error: "
+                    f"{str(error)}"
                 ),
             )
 
-        if not isinstance(suspicious_result, dict):
+
+        if not isinstance(
+            suspicious_result,
+            dict,
+        ):
+
             suspicious_result = {}
+
 
         suspicious_severity = str(
             suspicious_result.get(
@@ -801,6 +1009,7 @@ def finalize_verification(verification_id: str):
             )
         ).upper()
 
+
         suspicious = bool(
             suspicious_result.get(
                 "suspicious",
@@ -808,29 +1017,41 @@ def finalize_verification(verification_id: str):
             )
         )
 
-        # --------------------------------------------------------
-        # FINAL DECISION
-        # --------------------------------------------------------
 
-        if suspicious_severity == "HIGH" or suspicious:
+        # -------------------------------------------------
+        # FINAL DECISION
+        # -------------------------------------------------
+
+        if (
+            suspicious_severity == "HIGH"
+            or suspicious
+        ):
+
             decision = "BLOCK"
             final_state = "BLOCKED"
+
 
         elif risk_level == "HIGH":
+
             decision = "BLOCK"
             final_state = "BLOCKED"
 
+
         elif risk_level == "MEDIUM":
+
             decision = "REVIEW"
             final_state = "REVIEW"
 
+
         else:
+
             decision = "APPROVE"
             final_state = "APPROVED"
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # SAVE RISK ASSESSMENT
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         risk = RiskAssessment(
             session_id=session.session_id,
@@ -839,26 +1060,25 @@ def finalize_verification(verification_id: str):
             reason=reason,
         )
 
+
         db.add(risk)
 
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
         # UPDATE SESSION
-        # --------------------------------------------------------
+        # -------------------------------------------------
 
         session.status = final_state
 
-        if final_state in [
-            "APPROVED",
-            "BLOCKED",
-            "REVIEW",
-        ]:
-            session.completed_at = datetime.now()
+        session.completed_at = datetime.now()
+
 
         db.commit()
 
-        # --------------------------------------------------------
-        # AUDIT
-        # --------------------------------------------------------
+
+        # -------------------------------------------------
+        # AUDIT FINAL DECISION
+        # -------------------------------------------------
 
         if final_state == "APPROVED":
 
@@ -866,8 +1086,12 @@ def finalize_verification(verification_id: str):
                 session,
                 locker_number,
                 "VERIFICATION_APPROVED",
-                "Verification approved. Locker operation is allowed.",
+                (
+                    "Verification approved. "
+                    "Locker operation is allowed."
+                ),
             )
+
 
         elif final_state == "REVIEW":
 
@@ -875,8 +1099,12 @@ def finalize_verification(verification_id: str):
                 session,
                 locker_number,
                 "VERIFICATION_REVIEW",
-                "Verification requires manual review. Locker remains closed.",
+                (
+                    "Verification requires manual review. "
+                    "Locker remains closed."
+                ),
             )
+
 
         else:
 
@@ -884,8 +1112,12 @@ def finalize_verification(verification_id: str):
                 session,
                 locker_number,
                 "VERIFICATION_BLOCKED",
-                "Verification blocked. Locker operation is not allowed.",
+                (
+                    "Verification blocked. "
+                    "Locker operation is not allowed."
+                ),
             )
+
 
             if suspicious_severity == "HIGH":
 
@@ -893,12 +1125,74 @@ def finalize_verification(verification_id: str):
                     session,
                     locker_number,
                     "ALERT_RAISED",
-                    "High-risk suspicious activity detected. Locker operation blocked.",
+                    (
+                        "High-risk suspicious activity "
+                        "detected. Locker operation blocked."
+                    ),
                 )
 
-        return get_verification(verification_id)
 
+        # -------------------------------------------------
+        # RETURN COMPLETE FINAL DATA
+        # -------------------------------------------------
+
+        return {
+            "verification_id": str(
+                session.session_id
+            ),
+
+            "customer_id": session.customer_id,
+
+            "locker_id": locker_number,
+
+            "state": final_state,
+
+            "document_match": document_match,
+
+            "document_match_score": (
+                float(document.match_score)
+                if document
+                and document.match_score is not None
+                else None
+            ),
+
+            "face_match": face_match,
+
+            "face_match_score": (
+                float(face.match_score)
+                if face
+                and face.match_score is not None
+                else None
+            ),
+
+            "risk_decision": decision,
+
+            "risk_level": risk_level,
+
+            "risk_score": float(
+                risk_score
+            ),
+
+            "reason": reason,
+
+            "suspicious_activity": suspicious,
+
+            "suspicious_severity": (
+                suspicious_severity
+            ),
+
+            "created_at": (
+                session.started_at.isoformat()
+                if session.started_at
+                else None
+            ),
+
+            "updated_at": (
+                session.completed_at.isoformat()
+                if session.completed_at
+                else None
+            ),
+        }
 
     finally:
-
         db.close()

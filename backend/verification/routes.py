@@ -10,6 +10,7 @@ from .service import (
     finalize_verification,
 )
 
+
 router = APIRouter(
     prefix="/verification",
     tags=["Verification"],
