@@ -18,7 +18,7 @@ router = APIRouter(
 
 class VerificationStartRequest(BaseModel):
     customer_id: int
-    locker_id: int
+    locker_id: str
 
 
 class DocumentResultRequest(BaseModel):
@@ -31,10 +31,18 @@ class FaceResultRequest(BaseModel):
 
 @router.post("/start")
 def start(request: VerificationStartRequest):
-    return start_verification(
+    result = start_verification(
         request.customer_id,
         request.locker_id
     )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer or locker not found"
+        )
+
+    return result
 
 
 @router.get("/{verification_id}")
@@ -65,7 +73,7 @@ def document_result(
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found"
+            detail="Verification not found or document not found"
         )
 
     return session

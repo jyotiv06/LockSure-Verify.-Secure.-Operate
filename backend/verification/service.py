@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 
 from models.verification_session import VerificationSession
+from models.locker import Locker
 from models.document import Document
 from models.document_verification import DocumentVerification
 from models.face_verification import FaceVerification
@@ -15,14 +16,27 @@ def get_db():
     return SessionLocal()
 
 
-def start_verification(customer_id: int, locker_id: int):
+def start_verification(customer_id: int, locker_id: str):
 
     db: Session = get_db()
 
     try:
+        # locker_id from the API is the business locker number,
+        # for example "L001".
+        locker = (
+            db.query(Locker)
+            .filter(
+                Locker.locker_number == locker_id
+            )
+            .first()
+        )
+
+        if not locker:
+            return None
+
         session = VerificationSession(
             customer_id=customer_id,
-            locker_id=locker_id,
+            locker_id=locker.locker_id,
             status="IN_PROGRESS",
         )
 
@@ -33,7 +47,7 @@ def start_verification(customer_id: int, locker_id: int):
         return {
             "verification_id": str(session.session_id),
             "customer_id": session.customer_id,
-            "locker_id": session.locker_id,
+            "locker_id": locker.locker_number,
             "state": "INITIATED",
             "document_match": None,
             "face_match": None,
@@ -69,6 +83,14 @@ def get_verification(verification_id: str):
 
         if not session:
             return None
+
+        locker = (
+            db.query(Locker)
+            .filter(
+                Locker.locker_id == session.locker_id
+            )
+            .first()
+        )
 
         document = (
             db.query(DocumentVerification)
@@ -106,7 +128,11 @@ def get_verification(verification_id: str):
         return {
             "verification_id": str(session.session_id),
             "customer_id": session.customer_id,
-            "locker_id": session.locker_id,
+            "locker_id": (
+                locker.locker_number
+                if locker
+                else None
+            ),
             "state": session.status,
             "document_match": (
                 document.result == "PASSED"
@@ -131,9 +157,11 @@ def get_verification(verification_id: str):
             "updated_at": (
                 session.completed_at.isoformat()
                 if session.completed_at
-                else session.started_at.isoformat()
-                if session.started_at
-                else None
+                else (
+                    session.started_at.isoformat()
+                    if session.started_at
+                    else None
+                )
             ),
         }
 
@@ -160,7 +188,6 @@ def process_document(
         if not session:
             return None
 
-        # Find customer's latest document.
         document = (
             db.query(Document)
             .filter(
@@ -329,10 +356,22 @@ def finalize_verification(verification_id: str):
 
         db.commit()
 
+        locker = (
+            db.query(Locker)
+            .filter(
+                Locker.locker_id == session.locker_id
+            )
+            .first()
+        )
+
         return {
             "verification_id": str(session.session_id),
             "customer_id": session.customer_id,
-            "locker_id": session.locker_id,
+            "locker_id": (
+                locker.locker_number
+                if locker
+                else None
+            ),
             "state": state,
             "document_match": document_match,
             "face_match": face_match,
