@@ -249,6 +249,7 @@ def finalize_verification(verification_id: str):
     db: Session = get_db()
 
     try:
+
         session = (
             db.query(VerificationSession)
             .filter(
@@ -260,58 +261,144 @@ def finalize_verification(verification_id: str):
         if not session:
             return None
 
+
+        # =====================================
+        # GET LATEST DOCUMENT VERIFICATION
+        # =====================================
+
         document = (
             db.query(DocumentVerification)
             .filter(
-                DocumentVerification.session_id == session.session_id
+                DocumentVerification.session_id ==
+                session.session_id
             )
             .order_by(
-                DocumentVerification.document_verification_id.desc()
+                DocumentVerification
+                .document_verification_id
+                .desc()
             )
             .first()
         )
+
+
+        # =====================================
+        # GET LATEST FACE VERIFICATION
+        # =====================================
 
         face = (
             db.query(FaceVerification)
             .filter(
-                FaceVerification.session_id == session.session_id
+                FaceVerification.session_id ==
+                session.session_id
             )
             .order_by(
-                FaceVerification.face_verification_id.desc()
+                FaceVerification
+                .face_verification_id
+                .desc()
             )
             .first()
         )
 
-        document_match = (
-            document is not None
-            and document.result == "PASSED"
+
+        # =====================================
+        # DETERMINE VERIFICATION RESULTS
+        # =====================================
+
+        document_result = (
+            document.result
+            if document
+            else None
         )
+
+
+        face_result = (
+            face.result
+            if face
+            else None
+        )
+
+
+        document_match = (
+            document_result == "PASSED"
+        )
+
 
         face_match = (
-            face is not None
-            and face.result == "PASSED"
+            face_result == "PASSED"
         )
 
-        if document_match and face_match:
+
+        # =====================================
+        # FINAL DECISION
+        # =====================================
+
+        # Both verification checks passed
+        if (
+            document_result == "PASSED"
+            and face_result == "PASSED"
+        ):
+
             decision = "APPROVE"
             state = "APPROVED"
             risk_level = "LOW"
             risk_score = 10.00
-            reason = "Document and face verification passed."
 
-        elif not document_match or not face_match:
+            reason = (
+                "Document and face verification passed."
+            )
+
+
+        # Both verification checks failed
+        elif (
+            document_result == "FAILED"
+            and face_result == "FAILED"
+        ):
+
             decision = "BLOCK"
             state = "BLOCKED"
             risk_level = "HIGH"
             risk_score = 90.00
-            reason = "One or more verification checks failed."
 
-        else:
+            reason = (
+                "Document and face verification failed."
+            )
+
+
+        # One verification passed and
+        # the other failed
+        elif (
+            document_result in ["PASSED", "FAILED"]
+            and face_result in ["PASSED", "FAILED"]
+        ):
+
             decision = "REVIEW"
             state = "REVIEW"
             risk_level = "MEDIUM"
             risk_score = 50.00
-            reason = "Verification requires manual review."
+
+            reason = (
+                "Document and face verification "
+                "results do not match. Manual review required."
+            )
+
+
+        # One or both checks are missing
+        else:
+
+            decision = "REVIEW"
+            state = "REVIEW"
+            risk_level = "MEDIUM"
+            risk_score = 50.00
+
+            reason = (
+                "Verification is incomplete. "
+                "Manual review required."
+            )
+
+
+        # =====================================
+        # SAVE RISK ASSESSMENT
+        # =====================================
 
         risk = RiskAssessment(
             session_id=session.session_id,
@@ -322,25 +409,59 @@ def finalize_verification(verification_id: str):
 
         db.add(risk)
 
+
+        # =====================================
+        # UPDATE SESSION
+        # =====================================
+
         session.status = state
 
-        if state in ["APPROVED", "BLOCKED", "REVIEW"]:
-            session.completed_at = datetime.now()
+
+        session.completed_at = (
+            datetime.now()
+        )
+
 
         db.commit()
 
+
+        # =====================================
+        # RETURN FINAL RESULT
+        # =====================================
+
         return {
-            "verification_id": str(session.session_id),
-            "customer_id": session.customer_id,
-            "locker_id": session.locker_id,
-            "state": state,
-            "document_match": document_match,
-            "face_match": face_match,
-            "risk_decision": decision,
-            "risk_level": risk_level,
-            "risk_score": float(risk_score),
-            "reason": reason,
+            "verification_id":
+                str(session.session_id),
+
+            "customer_id":
+                session.customer_id,
+
+            "locker_id":
+                session.locker_id,
+
+            "state":
+                state,
+
+            "document_match":
+                document_match,
+
+            "face_match":
+                face_match,
+
+            "risk_decision":
+                decision,
+
+            "risk_level":
+                risk_level,
+
+            "risk_score":
+                float(risk_score),
+
+            "reason":
+                reason,
         }
 
+
     finally:
+
         db.close()

@@ -5,6 +5,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
+// Home / Portal Selection
+import PortalSelection from "./pages/PortalSelection";
+
 // Customer pages
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -23,6 +26,7 @@ import LockerOperation from "./pages/officer/LockerOperation";
 import SecurityAlerts from "./pages/officer/SecurityAlerts";
 import AuditHistory from "./pages/officer/AuditHistory";
 
+
 function App() {
   return (
     <BrowserRouter>
@@ -30,11 +34,21 @@ function App() {
       <Routes>
 
         {/* ========================= */}
-        {/* CUSTOMER PORTAL            */}
+        {/* HOME / PORTAL SELECTION   */}
         {/* ========================= */}
 
         <Route
           path="/"
+          element={<PortalSelection />}
+        />
+
+
+        {/* ========================= */}
+        {/* CUSTOMER PORTAL           */}
+        {/* ========================= */}
+
+        <Route
+          path="/customer/login"
           element={<Login />}
         />
 
@@ -68,8 +82,9 @@ function App() {
           element={<LockerStatus />}
         />
 
+
         {/* ========================= */}
-        {/* OFFICER PORTAL             */}
+        {/* OFFICER PORTAL            */}
         {/* ========================= */}
 
         <Route
@@ -116,9 +131,12 @@ function App() {
           path="/officer/history"
           element={<AuditHistory />}
         />
-  
 
-        {/* Unknown route */}
+
+        {/* ========================= */}
+        {/* UNKNOWN ROUTES            */}
+        {/* ========================= */}
+
         <Route
           path="*"
           element={
@@ -134,5 +152,6 @@ function App() {
     </BrowserRouter>
   );
 }
+
 
 export default App;
