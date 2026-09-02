@@ -1,12 +1,82 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import StatusBadge from "../components/StatusBadge";
-import { customer, lockerStatus } from "../data/mockData";
+import { getCurrentCustomer } from "../api/customer";
 
 function LockerStatus() {
   const navigate = useNavigate();
+
+  const [customer, setCustomer] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        if (!token) {
+          navigate("/login");
+          return;
+        }
+
+        const data = await getCurrentCustomer(token);
+        setCustomer(data);
+      } catch (err) {
+        console.error("Failed to fetch customer:", err);
+        setError("Unable to load locker information.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCustomer();
+  }, [navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Navbar />
+        <main className="max-w-3xl mx-auto px-6 py-12">
+          <p className="text-center text-gray-500">
+            Loading locker information...
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !customer) {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <Navbar />
+        <main className="max-w-3xl mx-auto px-6 py-12">
+          <p className="text-center text-red-500">
+            {error || "Customer information not available."}
+          </p>
+
+          <div className="mt-6 flex justify-center">
+            <Button
+              variant="secondary"
+              onClick={() => navigate("/dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const lockerStatus = customer.locker_status || "UNKNOWN";
+  const verificationStatus = customer.verification_status || "PENDING";
+
+  const isApproved =
+    verificationStatus === "APPROVED" ||
+    verificationStatus === "VERIFIED";
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -15,7 +85,7 @@ function LockerStatus() {
 
       <main className="max-w-3xl mx-auto px-6 py-8">
 
-        {/* Success Header */}
+        {/* Header */}
         <div className="text-center mb-8">
 
           <div className="text-5xl mb-4">
@@ -27,7 +97,7 @@ function LockerStatus() {
           </h2>
 
           <p className="text-gray-500 mt-2">
-            Your verification process is complete.
+            Your current locker and verification status.
           </p>
 
         </div>
@@ -37,14 +107,14 @@ function LockerStatus() {
 
           <div className="text-center">
 
-            <StatusBadge status={lockerStatus.status} />
+            <StatusBadge status={lockerStatus} />
 
             <h3 className="text-2xl font-semibold text-gray-800 mt-5">
-              Locker Ready
+              {isApproved ? "Locker Ready" : "Verification Pending"}
             </h3>
 
             <p className="text-gray-500 mt-2">
-              {lockerStatus.message}
+              Verification Status: {verificationStatus}
             </p>
 
           </div>
@@ -64,7 +134,7 @@ function LockerStatus() {
                 </p>
 
                 <p className="font-medium text-gray-800 mt-1">
-                  {customer.name}
+                  {customer.full_name || "Not available"}
                 </p>
               </div>
 
@@ -74,7 +144,7 @@ function LockerStatus() {
                 </p>
 
                 <p className="font-medium text-gray-800 mt-1">
-                  {customer.customerId}
+                  {customer.customer_id || "Not available"}
                 </p>
               </div>
 
@@ -84,7 +154,7 @@ function LockerStatus() {
                 </p>
 
                 <p className="font-medium text-gray-800 mt-1">
-                  {customer.lockerNumber}
+                  {customer.locker_number || "Not assigned"}
                 </p>
               </div>
 
@@ -94,7 +164,7 @@ function LockerStatus() {
                 </p>
 
                 <p className="font-medium text-gray-800 mt-1">
-                  {customer.branch}
+                  {customer.branch || "Not available"}
                 </p>
               </div>
 
@@ -102,22 +172,38 @@ function LockerStatus() {
 
           </div>
 
-          {/* Operation Button */}
+          {/* Verification Status */}
+          <div className="mt-8 border-t pt-6">
+
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Verification Status
+            </h3>
+
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">
+                Customer Verification
+              </span>
+
+              <StatusBadge status={verificationStatus} />
+            </div>
+
+          </div>
+
+          {/* Locker Operation */}
           <div className="mt-8 flex justify-center">
 
             <Button
-              onClick={() => alert("Locker operation approved (Demo)")}
+              disabled={!isApproved}
+              onClick={() => {
+                if (isApproved) {
+                  console.log("Locker operation approved by backend");
+                }
+              }}
             >
               🔓 Proceed to Locker Operation
             </Button>
 
           </div>
-
-          {/* Demo Notice */}
-          <p className="text-center text-xs text-gray-400 mt-5">
-            Demo mode — actual locker operation will be connected through
-            the backend.
-          </p>
 
         </Card>
 
