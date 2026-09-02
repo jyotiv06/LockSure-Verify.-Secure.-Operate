@@ -6,43 +6,75 @@ import {
   Clock3,
 } from "lucide-react";
 
-const details = [
-  {
-    label: "Customer",
-    value: "Rahul Sharma",
-    icon: UserRound,
-  },
-  {
-    label: "Customer ID",
-    value: "CUS-10482",
-    icon: CreditCard,
-  },
-  {
-    label: "Locker",
-    value: "LKR-204",
-    icon: LockKeyhole,
-  },
-  {
-    label: "Branch",
-    value: "Pune Central",
-    icon: Building2,
-  },
-  {
-    label: "Requested Operation",
-    value: "Open Locker",
-    icon: LockKeyhole,
-  },
-  {
-    label: "Request Time",
-    value: "08:42 PM",
-    icon: Clock3,
-  },
-];
+function CustomerDetails({ customer }) {
+  if (!customer) {
+    return (
+      <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+        <p className="text-sm text-[#64748B]">
+          Customer information is not available.
+        </p>
+      </div>
+    );
+  }
 
-function CustomerDetails() {
+  const details = [
+    {
+      label: "Customer",
+      value:
+        customer.full_name ||
+        customer.customer_name ||
+        customer.name ||
+        "N/A",
+      icon: UserRound,
+    },
+    {
+      label: "Customer ID",
+      value:
+        customer.customer_number ||
+        customer.customer_id ||
+        customer.id ||
+        "N/A",
+      icon: CreditCard,
+    },
+    {
+      label: "Locker",
+      value:
+        customer.locker_number ||
+        customer.locker_id ||
+        "No locker assigned",
+      icon: LockKeyhole,
+    },
+    {
+      label: "Branch",
+      value:
+        customer.branch_name ||
+        customer.branch ||
+        "N/A",
+      icon: Building2,
+    },
+    {
+      label: "Requested Operation",
+      value:
+        customer.operation ||
+        customer.requested_operation ||
+        "Open Locker",
+      icon: LockKeyhole,
+    },
+    {
+      label: "Request Time",
+      value:
+        customer.request_time ||
+        customer.created_at ||
+        new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      icon: Clock3,
+    },
+  ];
+
   return (
     <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
-
       <div className="mb-5">
         <h3 className="text-base font-bold text-[#111827]">
           Customer Details
@@ -54,7 +86,6 @@ function CustomerDetails() {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-
         {details.map((item) => {
           const Icon = item.icon;
 
@@ -79,7 +110,6 @@ function CustomerDetails() {
             </div>
           );
         })}
-
       </div>
     </div>
   );

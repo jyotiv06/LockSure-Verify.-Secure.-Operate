@@ -69,16 +69,14 @@ function RecommendationCard({ verificationData }) {
     is complete.
   */
 
-  const allVerified =
-    documentMatch === true &&
-    faceMatch === true &&
-    accountMatch === true;
+ const allVerified =
+  documentMatch === true &&
+  faceMatch === true;
 
 
-  const verificationFailed =
-    documentMatch === false ||
-    faceMatch === false ||
-    accountMatch === false;
+const verificationFailed =
+  documentMatch === false ||
+  faceMatch === false;
 
 
   /*

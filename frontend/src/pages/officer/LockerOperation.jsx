@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+
 import {
   ArrowLeft,
   Lock,
@@ -15,9 +16,39 @@ import OfficerLayout from "../../components/officer/OfficerLayout";
 
 function LockerOperations() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [lockerOpen, setLockerOpen] = useState(false);
   const [operationMessage, setOperationMessage] = useState("");
+
+  // Data received from Customer Verification page
+  const customer = location.state?.customer || {};
+
+  const customerName =
+    customer.full_name ||
+    customer.customer_name ||
+    customer.name ||
+    "Customer Not Available";
+
+  const customerId =
+    customer.customer_number ||
+    customer.customer_id ||
+    "N/A";
+
+  const lockerNumber =
+    customer.locker_number ||
+    customer.locker_id ||
+    "No locker assigned";
+
+  const branchName =
+    customer.branch_name ||
+    customer.branch ||
+    "Branch Not Available";
+
+  const lockerLocation =
+    customer.locker_location ||
+    customer.location ||
+    "Location Not Available";
 
   const handleOpenLocker = () => {
     setLockerOpen(true);
@@ -29,17 +60,24 @@ function LockerOperations() {
     setOperationMessage("Locker closed successfully.");
   };
 
+  const handleEndOperation = () => {
+    setLockerOpen(false);
+    setOperationMessage("");
+
+    navigate("/officer/dashboard");
+  };
+
   return (
     <OfficerLayout>
       {/* Back Button */}
       <button
         type="button"
-        onClick={() => navigate("/officer/dashboard")}
+        onClick={() => navigate(-1)}
         className="mb-5 flex items-center gap-2 text-xs font-semibold text-[#64748B] transition hover:text-[#2563EB]"
       >
         <ArrowLeft size={16} />
 
-        Back to Dashboard
+        Back
       </button>
 
       {/* Header */}
@@ -71,12 +109,11 @@ function LockerOperations() {
         {/* Locker Status */}
         <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-sm lg:col-span-2">
           <div className="flex flex-col items-center justify-center py-10 text-center">
+
             {/* Locker Icon */}
             <div
               className={`flex h-28 w-28 items-center justify-center rounded-3xl ${
-                lockerOpen
-                  ? "bg-green-50"
-                  : "bg-red-50"
+                lockerOpen ? "bg-green-50" : "bg-red-50"
               }`}
             >
               {lockerOpen ? (
@@ -99,9 +136,7 @@ function LockerOperations() {
 
             <h2
               className={`mt-2 text-3xl font-bold ${
-                lockerOpen
-                  ? "text-green-600"
-                  : "text-red-500"
+                lockerOpen ? "text-green-600" : "text-red-500"
               }`}
             >
               {lockerOpen ? "OPEN" : "LOCKED"}
@@ -139,7 +174,7 @@ function LockerOperations() {
 
               <button
                 type="button"
-                onClick={() => navigate("/officer/dashboard")}
+                onClick={handleEndOperation}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#E2E8F0] px-6 py-3 text-sm font-semibold text-[#475569] transition hover:bg-[#F8FAFC]"
               >
                 <Power size={17} />
@@ -161,6 +196,7 @@ function LockerOperations() {
           </p>
 
           <div className="mt-6 space-y-5">
+
             {/* Customer */}
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EFF6FF]">
@@ -176,7 +212,11 @@ function LockerOperations() {
                 </p>
 
                 <p className="mt-1 text-sm font-semibold text-[#111827]">
-                  Rahul Sharma
+                  {customerName}
+                </p>
+
+                <p className="mt-1 text-xs text-[#64748B]">
+                  {customerId}
                 </p>
               </div>
             </div>
@@ -196,7 +236,7 @@ function LockerOperations() {
                 </p>
 
                 <p className="mt-1 text-sm font-semibold text-[#111827]">
-                  LKR-204
+                  {lockerNumber}
                 </p>
               </div>
             </div>
@@ -216,7 +256,7 @@ function LockerOperations() {
                 </p>
 
                 <p className="mt-1 text-sm font-semibold text-[#111827]">
-                  Pune Central
+                  {branchName}
                 </p>
               </div>
             </div>
@@ -236,7 +276,7 @@ function LockerOperations() {
                 </p>
 
                 <p className="mt-1 text-sm font-semibold text-[#111827]">
-                  Section B · Row 04
+                  {lockerLocation}
                 </p>
               </div>
             </div>

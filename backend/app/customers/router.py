@@ -1,12 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from database import SessionLocal
+
 from models.user import User
 from models.customer import Customer
+from models.account import Account
 from models.locker import Locker
+from models.verification_session import VerificationSession
+from models.locker_operation import LockerOperation
 
 from ..auth.security import get_current_user
+
 
 router = APIRouter(
     prefix="/customers",
@@ -14,13 +20,22 @@ router = APIRouter(
 )
 
 
+# ============================================================
+# DATABASE DEPENDENCY
+# ============================================================
+
 def get_db():
     db = SessionLocal()
+
     try:
         yield db
     finally:
         db.close()
 
+
+# ============================================================
+# CURRENT LOGGED-IN CUSTOMER
+# ============================================================
 
 @router.get("/me")
 def get_my_profile(
@@ -28,6 +43,10 @@ def get_my_profile(
     db: Session = Depends(get_db),
 ):
     user_id = int(current_user["user_id"])
+
+    # --------------------------------------------------------
+    # USER
+    # --------------------------------------------------------
 
     user = (
         db.query(User)
@@ -41,6 +60,10 @@ def get_my_profile(
             detail="User not found",
         )
 
+    # --------------------------------------------------------
+    # CUSTOMER
+    # --------------------------------------------------------
+
     customer = (
         db.query(Customer)
         .filter(Customer.customer_id == user_id)
@@ -53,42 +76,152 @@ def get_my_profile(
             detail="Customer profile not found",
         )
 
+    # --------------------------------------------------------
+    # LOCKER
+    # --------------------------------------------------------
+
     locker = (
         db.query(Locker)
-        .filter(Locker.customer_id == user_id)
+        .filter(
+            Locker.customer_id == customer.customer_id
+        )
         .first()
     )
 
+    # --------------------------------------------------------
+    # LATEST VERIFICATION
+    # --------------------------------------------------------
+
+    latest_verification = (
+        db.query(VerificationSession)
+        .filter(
+            VerificationSession.customer_id
+            == customer.customer_id
+        )
+        .order_by(
+            VerificationSession.session_id.desc()
+        )
+        .first()
+    )
+
+    # --------------------------------------------------------
+    # BRANCH
+    # --------------------------------------------------------
+
+    branch = None
+
+    if locker:
+        branch = getattr(
+            locker,
+            "branch_name",
+            None,
+        )
+
+        if not branch:
+            branch = getattr(
+                locker,
+                "branch_code",
+                None,
+            )
+
+    # --------------------------------------------------------
+    # RESPONSE
+    # --------------------------------------------------------
+
     return {
-        # Actual logged-in user
-        "customer_db_id": user_id,
+        # Customer
+        "customer_db_id": customer.customer_id,
         "customer_id": customer.customer_number,
         "full_name": customer.full_name,
         "email": customer.email,
         "phone": customer.phone,
         "account_status": customer.status,
 
-        # Locker information
-        "locker_id": locker.locker_id if locker else None,
-        "locker_number": locker.locker_number if locker else None,
-        "locker_status": locker.status if locker else None,
-        "branch": locker.branch_name if locker else None,
+        # Account
+        "account_number": getattr(
+            customer,
+            "account_number",
+            None,
+        ),
 
-        "verification_status": "NOT_STARTED",
+        # Locker
+        "locker_id": (
+            locker.locker_id
+            if locker
+            else None
+        ),
+        "locker_number": (
+            locker.locker_number
+            if locker
+            else None
+        ),
+        "locker_status": (
+            locker.status
+            if locker
+            else None
+        ),
+        "branch": branch,
+
+        # Verification
+        "verification_id": (
+            str(latest_verification.session_id)
+            if latest_verification
+            else None
+        ),
+        "verification_status": (
+            latest_verification.status
+            if latest_verification
+            else "NOT_STARTED"
+        ),
     }
 
 
-@router.get("/{customer_id}")
+# ============================================================
+# CUSTOMER SEARCH
+# Used by Officer Dashboard
+# ============================================================
+
+@router.get("/{customer_identifier}")
 def get_customer(
-    customer_id: str,
+    customer_identifier: str,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # --------------------------------------------------------
+    # SEARCH BY CUSTOMER NUMBER
+    # Example: CUST000012
+    # --------------------------------------------------------
+
     customer = (
         db.query(Customer)
-        .filter(Customer.customer_number == customer_id)
+        .filter(
+            Customer.customer_number
+            == customer_identifier.upper()
+        )
         .first()
     )
+
+    # --------------------------------------------------------
+    # SEARCH BY NUMERIC CUSTOMER DB ID
+    # Example: 12
+    # --------------------------------------------------------
+
+    if (
+        not customer
+        and customer_identifier.isdigit()
+    ):
+        customer = (
+            db.query(Customer)
+            .filter(
+                Customer.customer_id
+                == int(customer_identifier)
+            )
+            .first()
+        )
+
+    # --------------------------------------------------------
+    # NOT FOUND
+    # --------------------------------------------------------
 
     if not customer:
         raise HTTPException(
@@ -96,10 +229,181 @@ def get_customer(
             detail="Customer not found",
         )
 
+    # --------------------------------------------------------
+    # ACCOUNT
+    # --------------------------------------------------------
+
+    account = (
+        db.query(Account)
+        .filter(
+            Account.customer_id
+            == customer.customer_id
+        )
+        .first()
+    )
+
+    # --------------------------------------------------------
+    # LOCKER
+    # --------------------------------------------------------
+
+    locker = (
+        db.query(Locker)
+        .filter(
+            Locker.customer_id
+            == customer.customer_id
+        )
+        .first()
+    )
+
+    # --------------------------------------------------------
+    # LATEST VERIFICATION
+    # --------------------------------------------------------
+
+    latest_verification = (
+        db.query(VerificationSession)
+        .filter(
+            VerificationSession.customer_id
+            == customer.customer_id
+        )
+        .order_by(
+            VerificationSession.session_id.desc()
+        )
+        .first()
+    )
+
+    # --------------------------------------------------------
+    # PREVIOUS LOCKER OPERATIONS
+    # --------------------------------------------------------
+
+    operation_count = (
+        db.query(
+            func.count(
+                LockerOperation.operation_id
+            )
+        )
+        .filter(
+            LockerOperation.customer_id
+            == customer.customer_id
+        )
+        .scalar()
+    )
+
+    # --------------------------------------------------------
+    # BRANCH
+    # --------------------------------------------------------
+
+    branch = None
+
+    if locker:
+        branch = getattr(
+            locker,
+            "branch_name",
+            None,
+        )
+
+        if not branch:
+            branch = getattr(
+                locker,
+                "branch_code",
+                None,
+            )
+
+    # --------------------------------------------------------
+    # RETURN COMPLETE CUSTOMER INFORMATION
+    # --------------------------------------------------------
+
     return {
-        "customer_id": customer.customer_number,
+        # ----------------------------------------------------
+        # Customer
+        # ----------------------------------------------------
+
+        "customer_db_id": customer.customer_id,
+
+        "customer_id": customer.customer_id,
+
+        "customer_number": customer.customer_number,
+
         "full_name": customer.full_name,
-        "email": customer.email,
+
         "phone": customer.phone,
-        "account_status": customer.status,
+
+        "email": customer.email,
+
+        "customer_status": customer.status,
+
+        # ----------------------------------------------------
+        # Account
+        # ----------------------------------------------------
+
+        "account_id": (
+            account.account_id
+            if account
+            else None
+        ),
+
+        "account_number": (
+            account.account_number
+            if account
+            else None
+        ),
+
+        "account_type": (
+            account.account_type
+            if account
+            else None
+        ),
+
+        "account_status": (
+            account.status
+            if account
+            else customer.status
+        ),
+
+        # ----------------------------------------------------
+        # Locker
+        # ----------------------------------------------------
+
+        "locker_id": (
+            locker.locker_id
+            if locker
+            else None
+        ),
+
+        "locker_number": (
+            locker.locker_number
+            if locker
+            else None
+        ),
+
+        "locker_status": (
+            locker.status
+            if locker
+            else None
+        ),
+
+        "branch": branch,
+
+        "branch_name": branch,
+
+        # ----------------------------------------------------
+        # Verification
+        # ----------------------------------------------------
+
+        "verification_id": (
+            str(latest_verification.session_id)
+            if latest_verification
+            else None
+        ),
+
+        "verification_status": (
+            latest_verification.status
+            if latest_verification
+            else "NOT_STARTED"
+        ),
+
+        # ----------------------------------------------------
+        # Operation History
+        # ----------------------------------------------------
+
+        "previous_operations": operation_count,
     }

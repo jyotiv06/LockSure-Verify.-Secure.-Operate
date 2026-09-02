@@ -12,9 +12,13 @@ from .service import (
 
 router = APIRouter(
     prefix="/verification",
-    tags=["Verification"]
+    tags=["Verification"],
 )
 
+
+# =====================================
+# REQUEST MODELS
+# =====================================
 
 class VerificationStartRequest(BaseModel):
     customer_id: int
@@ -37,6 +41,10 @@ class FaceResultRequest(BaseModel):
     live_image: Optional[str] = None
 
 
+# =====================================
+# START VERIFICATION
+# =====================================
+
 @router.post("/start")
 def start(request: VerificationStartRequest):
 
@@ -52,30 +60,40 @@ def start(request: VerificationStartRequest):
     if not result:
         raise HTTPException(
             status_code=404,
-            detail="Customer or locker not found"
+            detail="Customer or locker not found",
         )
 
     return result
 
 
+# =====================================
+# GET VERIFICATION SESSION
+# =====================================
+
 @router.get("/{verification_id}")
 def get_session(verification_id: str):
 
-    session = get_verification(verification_id)
+    session = get_verification(
+        verification_id
+    )
 
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found"
+            detail="Verification not found",
         )
 
     return session
 
 
+# =====================================
+# PROCESS DOCUMENT VERIFICATION
+# =====================================
+
 @router.post("/{verification_id}/document")
 def document_result(
     verification_id: str,
-    request: DocumentResultRequest
+    request: DocumentResultRequest,
 ):
 
     session = process_document(
@@ -88,16 +106,20 @@ def document_result(
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found or document not found"
+            detail="Verification not found or document not found",
         )
 
     return session
 
 
+# =====================================
+# PROCESS FACE VERIFICATION
+# =====================================
+
 @router.post("/{verification_id}/face")
 def face_result(
     verification_id: str,
-    request: FaceResultRequest
+    request: FaceResultRequest,
 ):
 
     session = process_face(
@@ -110,21 +132,27 @@ def face_result(
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found"
+            detail="Verification not found",
         )
 
     return session
 
 
+# =====================================
+# FINALIZE VERIFICATION
+# =====================================
+
 @router.post("/{verification_id}/finalize")
 def finalize(verification_id: str):
 
-    session = finalize_verification(verification_id)
+    session = finalize_verification(
+        verification_id
+    )
 
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found"
+            detail="Verification not found",
         )
 
     return session

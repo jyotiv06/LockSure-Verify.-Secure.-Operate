@@ -372,7 +372,6 @@ def process_document(
             )
 
         # -------------------------------
-        # -------------------------------
         # FIND OR CREATE CUSTOMER DOCUMENT
         # -------------------------------
 
@@ -582,6 +581,7 @@ def finalize_verification(verification_id: str):
     db: Session = get_db()
 
     try:
+
         session = (
             db.query(VerificationSession)
             .filter(
@@ -600,33 +600,62 @@ def finalize_verification(verification_id: str):
         document = (
             db.query(DocumentVerification)
             .filter(
-                DocumentVerification.session_id == session.session_id
+                DocumentVerification.session_id ==
+                session.session_id
             )
             .order_by(
-                DocumentVerification.document_verification_id.desc()
+                DocumentVerification
+                .document_verification_id
+                .desc()
             )
             .first()
         )
+
+
+        # =====================================
+        # GET LATEST FACE VERIFICATION
+        # =====================================
 
         face = (
             db.query(FaceVerification)
             .filter(
-                FaceVerification.session_id == session.session_id
+                FaceVerification.session_id ==
+                session.session_id
             )
             .order_by(
-                FaceVerification.face_verification_id.desc()
+                FaceVerification
+                .face_verification_id
+                .desc()
             )
             .first()
         )
 
-        document_match = (
-            document is not None
-            and document.result == "PASSED"
+
+        # =====================================
+        # DETERMINE VERIFICATION RESULTS
+        # =====================================
+
+        document_result = (
+            document.result
+            if document
+            else None
         )
 
+
+        face_result = (
+            face.result
+            if face
+            else None
+        )
+
+
+        document_match = (
+            document_result == "PASSED"
+        )
+
+
         face_match = (
-            face is not None
-            and face.result == "PASSED"
+            face_result == "PASSED"
         )
 
         # --------------------------------------------------------
@@ -869,5 +898,7 @@ def finalize_verification(verification_id: str):
 
         return get_verification(verification_id)
 
+
     finally:
+
         db.close()
