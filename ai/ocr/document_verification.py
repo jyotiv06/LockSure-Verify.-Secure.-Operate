@@ -21,14 +21,24 @@ import cv2
 # Initialize PaddleOCR once when this module is imported.
 # The LockSure demo documents are front-facing, so the extra document
 # orientation/unwarping pipelines are unnecessary and slow on CPU.
-ocr = PaddleOCR(
-    lang="en",
-    device="cpu",
-    enable_mkldnn=False,
-    use_doc_orientation_classify=False,
-    use_doc_unwarping=False,
-    use_textline_orientation=False
-)
+ocr = None
+
+
+def _get_ocr():
+    global ocr
+
+    if ocr is None:
+        ocr = PaddleOCR(
+            lang="en",
+            device="cpu",
+            enable_mkldnn=False,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False
+        )
+
+    return ocr
+
 
 
 # ============================================================
@@ -51,11 +61,14 @@ def normalize_text(text):
 
 def extract_fields(ocr_texts):
     """
-    Extract the four required identity fields from OCR text.
+    Extract Name, DOB, ID number, and Address from OCR output.
 
-    Label matching is tolerant of casing/spacing variations. The extracted
-    values are still checked by compare_fields(), which requires all four
-    fields to match.
+    Supports:
+      Name: Jyoti Vaggu
+      Name - Jyoti Vaggu
+      NAME Jyoti Vaggu
+    and also handles a label appearing on one OCR line and its value on
+    the next OCR line.
     """
     fields = {
         "name": None,
@@ -64,27 +77,40 @@ def extract_fields(ocr_texts):
         "address": None
     }
 
-    patterns = [
-        ("name", r"^(?:full\\s*name|name)\\s*[:\\-]?\\s*(.+)$"),
-        ("dob", r"^(?:date\\s*of\\s*birth|dob)\\s*[:\\-]?\\s*(.+)$"),
-        ("id_number", r"^(?:id\\s*number|id\\s*no|id)\\s*[:\\-]?\\s*(.+)$"),
-        ("address", r"^address\\s*[:\\-]?\\s*(.+)$"),
-    ]
-
+    cleaned = []
     for raw_text in ocr_texts:
         if not raw_text:
             continue
 
-        normalized = re.sub(r"\\s+", " ", str(raw_text).strip())
-        if not normalized:
-            continue
+        value = re.sub(r"\s+", " ", str(raw_text).strip())
+        if value:
+            cleaned.append(value)
 
+    patterns = [
+        ("name", re.compile(r"^(?:full\s*name|name)\s*[:\-]?\s*(.+)$", re.I)),
+        ("dob", re.compile(r"^(?:date\s*of\s*birth|dob)\s*[:\-]?\s*(.+)$", re.I)),
+        ("id_number", re.compile(r"^(?:id\s*number|id\s*no|id)\s*[:\-]?\s*(.+)$", re.I)),
+        ("address", re.compile(r"^address\s*[:\-]?\s*(.+)$", re.I)),
+    ]
+
+    label_only = [
+        ("name", re.compile(r"^(?:full\s*name|name)\s*[:\-]?\s*$", re.I)),
+        ("dob", re.compile(r"^(?:date\s*of\s*birth|dob)\s*[:\-]?\s*$", re.I)),
+        ("id_number", re.compile(r"^(?:id\s*number|id\s*no|id)\s*[:\-]?\s*$", re.I)),
+        ("address", re.compile(r"^address\s*[:\-]?\s*$", re.I)),
+    ]
+
+    for index, line in enumerate(cleaned):
         for field, pattern in patterns:
-            match = re.match(pattern, normalized, flags=re.IGNORECASE)
-            if match:
-                value = match.group(1).strip()
-                if value and not fields[field]:
-                    fields[field] = value
+            match = pattern.match(line)
+            if match and not fields[field]:
+                fields[field] = match.group(1).strip()
+                break
+
+        for field, pattern in label_only:
+            if pattern.match(line) and not fields[field]:
+                if index + 1 < len(cleaned):
+                    fields[field] = cleaned[index + 1].strip()
                 break
 
     return fields
@@ -93,6 +119,34 @@ def extract_fields(ocr_texts):
 # ============================================================
 # FIELD COMPARISON
 # ============================================================
+
+def _normalize_dob(value):
+    """Normalize common DOB formats to YYYY-MM-DD for comparison."""
+    if value is None:
+        return ""
+
+    value = str(value).strip()
+
+    # Database/ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS...
+    iso_match = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})", value)
+    if iso_match:
+        year, month, day = iso_match.groups()
+        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+    # Demo document format: DD/MM/YYYY
+    slash_match = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", value)
+    if slash_match:
+        day, month, year = slash_match.groups()
+        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+    # Also tolerate DD-MM-YYYY.
+    dash_match = re.match(r"^(\d{1,2})-(\d{1,2})-(\d{4})$", value)
+    if dash_match:
+        day, month, year = dash_match.groups()
+        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+    return normalize_text(value)
+
 
 def compare_fields(extracted_data, customer_data):
 
@@ -113,8 +167,8 @@ def compare_fields(extracted_data, customer_data):
     dob_match = (
         bool(extracted_data.get("dob"))
         and bool(customer_data.get("dob"))
-        and normalize_text(extracted_data.get("dob"))
-        == normalize_text(customer_data.get("dob"))
+        and _normalize_dob(extracted_data.get("dob"))
+        == _normalize_dob(customer_data.get("dob"))
     )
 
     address_match = (
@@ -124,20 +178,31 @@ def compare_fields(extracted_data, customer_data):
         == normalize_text(customer_data.get("address"))
     )
 
-    # All four fields must match
-    verified = (
-        name_match
-        and id_match
-        and dob_match
-        and address_match
-    )
+    # The Customer schema allows date_of_birth and address to be NULL.
+    # Therefore they cannot be treated as mandatory when the database has
+    # no value to compare against. Name and customer_number remain mandatory.
+    required_matches = [name_match, id_match]
+
+    if customer_data.get("dob") not in (None, ""):
+        required_matches.append(dob_match)
+
+    if customer_data.get("address") not in (None, ""):
+        required_matches.append(address_match)
+
+    verified = all(required_matches)
 
     return {
         "verified": verified,
         "name_match": name_match,
         "id_match": id_match,
         "dob_match": dob_match,
-        "address_match": address_match
+        "address_match": address_match,
+        "verification_policy": {
+            "name_required": True,
+            "id_number_required": True,
+            "dob_required": bool(customer_data.get("dob")),
+            "address_required": bool(customer_data.get("address"))
+        }
     }
 
 
@@ -147,33 +212,44 @@ def compare_fields(extracted_data, customer_data):
 
 def _collect_ocr_texts(image_path):
     """
-    Run the cached PaddleOCR engine on one image and return recognized text.
+    Run PaddleOCR and extract recognized strings.
+
+    PaddleOCR 3.x returns result objects that expose dictionary-like
+    fields such as rec_texts. This helper also tolerates attribute-style
+    access so the integration is less sensitive to minor API differences.
     """
-    results = ocr.predict(image_path)
+    results = _get_ocr().predict(image_path)
     texts = []
 
     for result in results:
+        rec_texts = []
+
         try:
-            rec_texts = result.get("rec_texts", [])
-        except AttributeError:
+            if hasattr(result, "get"):
+                rec_texts = result.get("rec_texts", []) or []
+        except Exception:
             rec_texts = []
 
-        if rec_texts:
-            texts.extend(
-                str(value).strip()
-                for value in rec_texts
-                if value and str(value).strip()
-            )
+        if not rec_texts:
+            try:
+                rec_texts = getattr(result, "rec_texts", []) or []
+            except Exception:
+                rec_texts = []
+
+        for value in rec_texts:
+            value = str(value).strip()
+            if value:
+                texts.append(value)
 
     return texts
 
-
 def _prepare_ocr_variants(image_path):
     """
-    Create a small number of OCR-friendly variants for low-quality photos.
+    Create OCR-friendly variants for document photos.
 
-    The original image is always tested first. Extra variants only improve
-    text detection; they do not change the strict verification rules.
+    The original image is always tested first. Additional variants are used
+    only to improve text detection on screenshots, phone photos, compression,
+    low contrast, or small text. Verification remains strict.
     """
     variants = [str(image_path)]
     temporary_files = []
@@ -185,7 +261,10 @@ def _prepare_ocr_variants(image_path):
             return variants, temporary_files
 
         height, width = image.shape[:2]
-        scale = 2.0 if max(height, width) < 1600 else 1.5
+
+        # Keep the document large enough for text detection.
+        longest = max(height, width)
+        scale = 2.0 if longest < 1800 else 1.5
 
         upscaled = cv2.resize(
             image,
@@ -196,11 +275,30 @@ def _prepare_ocr_variants(image_path):
         )
 
         gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
-        enhanced = cv2.equalizeHist(gray)
+
+        # Contrast enhancement.
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        contrast = clahe.apply(gray)
+
+        # Adaptive threshold helps with uneven lighting/backgrounds.
+        adaptive = cv2.adaptiveThreshold(
+            contrast,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY,
+            31,
+            11
+        )
+
+        # Mild sharpening preserves characters without aggressive noise.
+        blurred = cv2.GaussianBlur(contrast, (0, 0), 1.0)
+        sharpened = cv2.addWeighted(contrast, 1.5, blurred, -0.5, 0)
 
         for prefix, variant in (
             ("ocr_upscaled_", upscaled),
-            ("ocr_enhanced_", enhanced),
+            ("ocr_contrast_", contrast),
+            ("ocr_adaptive_", adaptive),
+            ("ocr_sharpened_", sharpened),
         ):
             temp_file = tempfile.NamedTemporaryFile(
                 prefix=prefix,
@@ -225,38 +323,37 @@ def _prepare_ocr_variants(image_path):
 
     return variants, temporary_files
 
-
 def run_ocr_on_image(image_path):
     """
-    Run OCR on the original image plus a small number of preprocessing
-    variants and combine unique recognized text.
+    Run PaddleOCR 3.x on an image and return recognized text lines.
     """
-    variants, temporary_files = _prepare_ocr_variants(image_path)
-
-    all_texts = []
-    seen = set()
-
     try:
-        for variant in variants:
-            try:
-                texts = _collect_ocr_texts(variant)
-            except Exception:
-                continue
+        results = _get_ocr().predict(image_path)
 
-            for value in texts:
-                key = normalize_text(value)
-                if key and key not in seen:
-                    seen.add(key)
-                    all_texts.append(value)
+        texts = []
 
-    finally:
-        for temp_path in temporary_files:
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
+        for result in results:
+            # PaddleOCR 3.x returns recognized text in rec_texts
+            if isinstance(result, dict):
+                rec_texts = result.get("rec_texts", [])
+            else:
+                try:
+                    rec_texts = result["rec_texts"]
+                except Exception:
+                    rec_texts = getattr(result, "rec_texts", [])
 
-    return all_texts
+            if rec_texts:
+                texts.extend(
+                    str(text).strip()
+                    for text in rec_texts
+                    if str(text).strip()
+                )
+
+        return texts
+
+    except Exception as error:
+        print(f"OCR error: {error}")
+        return []
 
 # ============================================================
 # DOCUMENT PHOTO EXTRACTION
@@ -585,6 +682,9 @@ def verify_document(image, customer_data):
 
             "extracted_fields":
                 extracted_fields,
+
+            "ocr_text":
+                ocr_texts,
 
             "document_photo_path":
                 document_photo_path

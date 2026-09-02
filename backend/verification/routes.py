@@ -325,9 +325,10 @@ async def face_upload(
 
     Browser camera image
         -> FastAPI upload
+        -> previously uploaded identity document
+        -> extract reference face
         -> Dhanashree DeepFace
         -> actual matched/confidence result
-        -> persisted FaceVerification
     """
 
     saved_path = _save_upload(

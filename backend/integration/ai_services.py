@@ -2,21 +2,11 @@ from pathlib import Path
 import importlib.util
 
 
-# ============================================================
-# PROJECT ROOT
-# ============================================================
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
-# ============================================================
-# DYNAMIC MODULE LOADER
-# ============================================================
-
 def _load_module(module_name: str, file_path: Path):
-    """
-    Dynamically load an AI/intelligence module from the project.
-    """
+    """Dynamically load an AI/intelligence module from the project."""
 
     if not file_path.exists():
         raise FileNotFoundError(
@@ -34,33 +24,16 @@ def _load_module(module_name: str, file_path: Path):
         )
 
     module = importlib.util.module_from_spec(spec)
-
     spec.loader.exec_module(module)
 
     return module
 
 
-# ============================================================
-# SAMIKSHA - DOCUMENT VERIFICATION
-# ============================================================
-
 def verify_document_real(
     image_path: str,
     customer_data: dict
 ):
-    """
-    Call Samiksha's real PaddleOCR document verification.
-
-    Expected function:
-
-        verify_document(document, customer_data)
-
-    customer_data:
-        name
-        dob
-        id_number
-        address
-    """
+    """Call Samiksha's real PaddleOCR document verification."""
 
     file_path = (
         PROJECT_ROOT
@@ -86,32 +59,42 @@ def verify_document_real(
     )
 
 
-# ============================================================
-# DHANASHREE - FACE VERIFICATION
-# ============================================================
+def extract_document_photo_real(image_path: str):
+    """Extract the photo region from the verified identity document."""
+
+    file_path = (
+        PROJECT_ROOT
+        / "ai"
+        / "ocr"
+        / "document_verification.py"
+    )
+
+    module = _load_module(
+        "locksure_document_photo_ai",
+        file_path
+    )
+
+    if not hasattr(module, "extract_document_photo"):
+        raise AttributeError(
+            "Samiksha's document_verification.py "
+            "does not contain extract_document_photo()"
+        )
+
+    result = module.extract_document_photo(image_path)
+
+    if not isinstance(result, dict):
+        raise RuntimeError(
+            "extract_document_photo() returned an invalid result."
+        )
+
+    return result
+
 
 def verify_face_real(
     reference_image: str,
     live_image: str
 ):
-    """
-    Call Dhanashree's real DeepFace face verification.
-
-    Expected function:
-
-        verify_face(reference_image, live_image)
-
-    Dhanashree's function returns a dictionary such as:
-
-        {
-            "matched": True,
-            "confidence": 0.95,
-            "status": "VERIFIED",
-            "model": "ArcFace",
-            "distance": ...,
-            "threshold": ...
-        }
-    """
+    """Call Dhanashree's real DeepFace face verification."""
 
     file_path = (
         PROJECT_ROOT
@@ -131,55 +114,28 @@ def verify_face_real(
             "does not contain verify_face()"
         )
 
-    # Call Dhanashree's real DeepFace implementation
     result = module.verify_face(
         reference_image,
         live_image
     )
 
-    # Dhanashree's function MUST return a dictionary.
     if result is None:
         raise RuntimeError(
             "Dhanashree's verify_face() returned None. "
-            "Make sure face_verify.py returns the "
-            "verification result dictionary."
+            "Make sure face_verify.py returns the verification result dictionary."
         )
 
     if not isinstance(result, dict):
         raise RuntimeError(
-            "Dhanashree's verify_face() returned an invalid "
-            "result. Expected a dictionary."
+            "Dhanashree's verify_face() returned an invalid result. "
+            "Expected a dictionary."
         )
-
-    # --------------------------------------------------------
-    # Normalize the result for the backend.
-    #
-    # Dhanashree uses:
-    #
-    #     matched
-    #
-    # Our backend uses:
-    #
-    #     matched
-    #
-    # Therefore no conversion is required.
-    # --------------------------------------------------------
 
     return result
 
 
-# ============================================================
-# ANISHA - RISK ENGINE
-# ============================================================
-
 def calculate_risk_real(data: dict):
-    """
-    Call Anisha's real risk engine.
-
-    Expected function:
-
-        calculate_risk(data)
-    """
+    """Call Anisha's real risk engine."""
 
     file_path = (
         PROJECT_ROOT
@@ -194,21 +150,14 @@ def calculate_risk_real(data: dict):
 
     if not hasattr(module, "calculate_risk"):
         raise AttributeError(
-            "risk_engine.py does not contain "
-            "calculate_risk()"
+            "risk_engine.py does not contain calculate_risk()"
         )
 
     return module.calculate_risk(data)
 
 
-# ============================================================
-# SUSPICIOUS ACTIVITY ENGINE
-# ============================================================
-
 def detect_suspicious_real(data: dict):
-    """
-    Call suspicious activity engine.
-    """
+    """Call suspicious activity engine."""
 
     file_path = (
         PROJECT_ROOT
@@ -221,10 +170,7 @@ def detect_suspicious_real(data: dict):
         file_path
     )
 
-    if not hasattr(
-        module,
-        "detect_suspicious_activity"
-    ):
+    if not hasattr(module, "detect_suspicious_activity"):
         raise AttributeError(
             "suspicious_engine.py does not contain "
             "detect_suspicious_activity()"

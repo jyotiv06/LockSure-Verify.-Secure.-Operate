@@ -21,6 +21,9 @@ from integration.ai_services import (
     calculate_risk_real,
     detect_suspicious_real,
 )
+from pathlib import Path
+
+from database import get_db
 
 
 # Extra risk/AI inputs supplied when verification starts.
@@ -308,29 +311,67 @@ def process_document(
             {},
         )
 
-        data = (
-            customer_data
-            or context.get("customer_data", {})
+        # ------------------------------------------------------------
+        # BUILD CUSTOMER VERIFICATION DATA FROM THE DATABASE
+        # ------------------------------------------------------------
+        # The frontend may send partial customer_data (for example only
+        # name/email/phone). Do NOT use that partial payload as the
+        # verification source of truth. Always load the logged-in
+        # customer's database record and merge any explicitly supplied
+        # values on top only when present.
+        #
+        # Current Customer schema provides:
+        #   full_name       -> name
+        #   date_of_birth   -> dob
+        #   customer_number -> id_number (demo identity number)
+        #   address         -> address
+        # ------------------------------------------------------------
+
+        context_data = context.get("customer_data", {}) or {}
+        supplied_data = customer_data or {}
+
+        customer = (
+            db.query(Customer)
+            .filter(
+                Customer.customer_id == session.customer_id
+            )
+            .first()
         )
 
-        # If the frontend did not send customer_data, build the
-        # comparison payload from the logged-in customer's record.
-        if not data:
-            customer = (
-                db.query(Customer)
-                .filter(
-                    Customer.customer_id == session.customer_id
-                )
-                .first()
+        if not customer:
+            raise HTTPException(
+                status_code=404,
+                detail="Customer record not found for verification."
             )
 
-            if customer:
-                data = {
-                    "name": customer.full_name,
-                    "id_number": customer.customer_number,
-                    "email": customer.email,
-                    "phone": customer.phone,
-                }
+        data = {
+            "name": customer.full_name,
+            "dob": (
+                customer.date_of_birth.isoformat()
+                if customer.date_of_birth
+                else None
+            ),
+            "id_number": customer.customer_number,
+            "address": customer.address,
+            "email": customer.email,
+            "phone": customer.phone,
+        }
+
+        # Preserve any explicitly supplied non-empty fields, while the
+        # database remains the source of truth for missing values.
+        for key, value in {**context_data, **supplied_data}.items():
+            if value is not None and str(value).strip():
+                data[key] = value
+
+        # Normalize common API field names before sending data to OCR.
+        if not data.get("dob") and data.get("date_of_birth"):
+            data["dob"] = data["date_of_birth"]
+
+        if not data.get("name") and data.get("full_name"):
+            data["name"] = data["full_name"]
+
+        if not data.get("id_number") and data.get("customer_number"):
+            data["id_number"] = data["customer_number"]
 
         # -------------------------------
         # REAL OCR MODE
@@ -412,6 +453,16 @@ def process_document(
         # SAVE DOCUMENT VERIFICATION
         # -------------------------------
 
+        # Keep OCR diagnostics in the in-memory result for API callers.
+        # These do not affect the verification decision.
+        if isinstance(result, dict):
+            result.setdefault("customer_data_used", {
+                "name": data.get("name"),
+                "dob": data.get("dob"),
+                "id_number": data.get("id_number"),
+                "address": data.get("address"),
+            })
+
         document_score = 100.00 if document_match else 0.00
         if isinstance(result, dict):
             for key in (
@@ -475,6 +526,12 @@ def process_face(
     reference_image: str | None = None,
     live_image: str | None = None,
 ):
+    """Run real DeepFace verification using the verified document image.
+
+    DeepFace receives the original verified document image and the live
+    webcam image. DeepFace performs face detection internally, so no
+    separate OCR/photo-extraction pipeline is required here.
+    """
 
     db: Session = get_db()
 
@@ -482,8 +539,7 @@ def process_face(
         session = (
             db.query(VerificationSession)
             .filter(
-                VerificationSession.session_id
-                == int(verification_id)
+                VerificationSession.session_id == int(verification_id)
             )
             .first()
         )
@@ -500,30 +556,71 @@ def process_face(
                 ),
             )
 
-        # -------------------------------
-        # REAL FACE VERIFICATION
-        # -------------------------------
+        result = None
 
-        # The identity document uploaded in the previous step is the
-        # registered reference image for this verification session.
-        # Dhanashree's DeepFace module compares it with the live camera
-        # image. This avoids sending face_match=true from the UI.
-        if live_image and not reference_image:
-            document = (
-                db.query(Document)
-                .filter(
-                    Document.customer_id == session.customer_id
+        # Real browser flow: only live_image is supplied.
+        # Automatically obtain the reference photo from the verified document.
+        if live_image:
+            if not reference_image:
+                document_verification = (
+                    db.query(DocumentVerification)
+                    .filter(
+                        DocumentVerification.session_id
+                        == session.session_id
+                    )
+                    .order_by(
+                        DocumentVerification.document_verification_id.desc()
+                    )
+                    .first()
                 )
-                .order_by(
-                    Document.document_id.desc()
+
+                if not document_verification:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="No verified document found for face verification.",
+                    )
+
+                document = (
+                    db.query(Document)
+                    .filter(
+                        Document.document_id
+                        == document_verification.document_id
+                    )
+                    .first()
                 )
-                .first()
-            )
 
-            if document and document.document_reference:
-                reference_image = document.document_reference
+                if not document or not document.document_reference:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Reference document image is unavailable.",
+                    )
 
-        if reference_image and live_image:
+                document_path = document.document_reference
+
+                if not Path(document_path).exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "Reference document image does not exist: "
+                            f"{document_path}"
+                        ),
+                    )
+
+                # Use the original verified document image as the DeepFace
+                # reference. DeepFace performs its own face detection, so
+                # there is no need to crop the document photo beforehand.
+                # This avoids the PaddleOCR pipeline being initialized during
+                # face verification and preserves the full document image.
+                reference_image = document_path
+
+            if not Path(reference_image).exists():
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Reference face image does not exist: "
+                        f"{reference_image}"
+                    ),
+                )
 
             try:
                 result = verify_face_real(
@@ -539,23 +636,13 @@ def process_face(
             if not isinstance(result, dict):
                 raise HTTPException(
                     status_code=500,
-                    detail=(
-                        "Face verification returned "
-                        "an invalid result."
-                    ),
+                    detail="Face verification returned an invalid result.",
                 )
 
-            # Dhanashree integration returns "matched".
-            face_match = bool(
-                result.get("matched", False)
-            )
+            face_match = bool(result.get("matched", False))
 
-        # -------------------------------
-        # MANUAL TEST MODE
-        # -------------------------------
-
+        # Explicit backend-only test mode.
         elif face_match is not None:
-
             result = {
                 "matched": bool(face_match),
                 "source": "manual_test_input",
@@ -565,14 +652,10 @@ def process_face(
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Provide reference_image + live_image "
-                    "for real face AI or face_match for testing."
+                    "Provide live_image for real face AI "
+                    "or face_match for testing."
                 ),
             )
-
-        # -------------------------------
-        # SAVE RESULT
-        # -------------------------------
 
         face_score = 100.00 if face_match else 0.00
 
@@ -584,10 +667,13 @@ def process_face(
                 "score",
             ):
                 value = result.get(key)
+
                 if isinstance(value, (int, float)):
                     face_score = float(value)
+
                     if face_score <= 1:
                         face_score *= 100
+
                     face_score = max(
                         0.0,
                         min(100.0, face_score),
@@ -598,11 +684,7 @@ def process_face(
             session_id=session.session_id,
             customer_id=session.customer_id,
             match_score=face_score,
-            result=(
-                "PASSED"
-                if face_match
-                else "FAILED"
-            ),
+            result="PASSED" if face_match else "FAILED",
         )
 
         db.add(verification)
@@ -626,11 +708,7 @@ def process_face(
         _audit(
             session,
             locker.locker_number if locker else None,
-            (
-                "FACE_VERIFIED"
-                if face_match
-                else "FACE_FAILED"
-            ),
+            "FACE_VERIFIED" if face_match else "FACE_FAILED",
             (
                 "Face verification passed."
                 if face_match
@@ -638,11 +716,31 @@ def process_face(
             ),
         )
 
-        return get_verification(verification_id)
+        response = get_verification(verification_id)
+
+        if isinstance(response, dict):
+            response["face_score"] = face_score
+
+            if isinstance(result, dict):
+                response["face_ai"] = {
+                    key: value
+                    for key, value in result.items()
+                    if key in (
+                        "matched",
+                        "confidence",
+                        "distance",
+                        "threshold",
+                        "model",
+                        "detector_backend",
+                        "similarity_metric",
+                        "status",
+                    )
+                }
+
+        return response
 
     finally:
         db.close()
-
 
 def finalize_verification(verification_id: str):
 
