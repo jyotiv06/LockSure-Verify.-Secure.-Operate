@@ -12,7 +12,7 @@ class DocumentVerification(Base):
         primary_key=True,
         autoincrement=True
     )
-
+    
     session_id = Column(
         BigInteger,
         ForeignKey("verification_sessions.session_id"),

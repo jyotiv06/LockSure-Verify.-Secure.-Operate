@@ -18,10 +18,16 @@ import cv2
 # OCR INITIALIZATION
 # ============================================================
 
+# Initialize PaddleOCR once when this module is imported.
+# The LockSure demo documents are front-facing, so the extra document
+# orientation/unwarping pipelines are unnecessary and slow on CPU.
 ocr = PaddleOCR(
     lang="en",
     device="cpu",
-    enable_mkldnn=False
+    enable_mkldnn=False,
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False
 )
 
 
@@ -44,7 +50,13 @@ def normalize_text(text):
 # ============================================================
 
 def extract_fields(ocr_texts):
+    """
+    Extract the four required identity fields from OCR text.
 
+    Label matching is tolerant of casing/spacing variations. The extracted
+    values are still checked by compare_fields(), which requires all four
+    fields to match.
+    """
     fields = {
         "name": None,
         "dob": None,
@@ -52,50 +64,28 @@ def extract_fields(ocr_texts):
         "address": None
     }
 
-    for text in ocr_texts:
+    patterns = [
+        ("name", r"^(?:full\\s*name|name)\\s*[:\\-]?\\s*(.+)$"),
+        ("dob", r"^(?:date\\s*of\\s*birth|dob)\\s*[:\\-]?\\s*(.+)$"),
+        ("id_number", r"^(?:id\\s*number|id\\s*no|id)\\s*[:\\-]?\\s*(.+)$"),
+        ("address", r"^address\\s*[:\\-]?\\s*(.+)$"),
+    ]
 
-        if not text:
+    for raw_text in ocr_texts:
+        if not raw_text:
             continue
 
-        text = text.strip()
-        lower_text = text.lower()
+        normalized = re.sub(r"\\s+", " ", str(raw_text).strip())
+        if not normalized:
+            continue
 
-        # ----------------------------------------------------
-        # NAME
-        # ----------------------------------------------------
-
-        if lower_text.startswith("name:"):
-            fields["name"] = text.split(":", 1)[1].strip()
-
-        elif lower_text.startswith("full name:"):
-            fields["name"] = text.split(":", 1)[1].strip()
-
-        # ----------------------------------------------------
-        # DATE OF BIRTH
-        # ----------------------------------------------------
-
-        elif lower_text.startswith("date of birth:"):
-            fields["dob"] = text.split(":", 1)[1].strip()
-
-        elif lower_text.startswith("dob:"):
-            fields["dob"] = text.split(":", 1)[1].strip()
-
-        # ----------------------------------------------------
-        # ID NUMBER
-        # ----------------------------------------------------
-
-        elif lower_text.startswith("id number:"):
-            fields["id_number"] = text.split(":", 1)[1].strip()
-
-        elif lower_text.startswith("id no:"):
-            fields["id_number"] = text.split(":", 1)[1].strip()
-
-        # ----------------------------------------------------
-        # ADDRESS
-        # ----------------------------------------------------
-
-        elif lower_text.startswith("address:"):
-            fields["address"] = text.split(":", 1)[1].strip()
+        for field, pattern in patterns:
+            match = re.match(pattern, normalized, flags=re.IGNORECASE)
+            if match:
+                value = match.group(1).strip()
+                if value and not fields[field]:
+                    fields[field] = value
+                break
 
     return fields
 
@@ -155,24 +145,118 @@ def compare_fields(extracted_data, customer_data):
 # RUN OCR
 # ============================================================
 
-def run_ocr_on_image(image_path):
-
+def _collect_ocr_texts(image_path):
+    """
+    Run the cached PaddleOCR engine on one image and return recognized text.
+    """
     results = ocr.predict(image_path)
-
-    ocr_texts = []
+    texts = []
 
     for result in results:
+        try:
+            rec_texts = result.get("rec_texts", [])
+        except AttributeError:
+            rec_texts = []
 
-        texts = result.get(
-            "rec_texts",
-            []
+        if rec_texts:
+            texts.extend(
+                str(value).strip()
+                for value in rec_texts
+                if value and str(value).strip()
+            )
+
+    return texts
+
+
+def _prepare_ocr_variants(image_path):
+    """
+    Create a small number of OCR-friendly variants for low-quality photos.
+
+    The original image is always tested first. Extra variants only improve
+    text detection; they do not change the strict verification rules.
+    """
+    variants = [str(image_path)]
+    temporary_files = []
+
+    try:
+        image = cv2.imread(str(image_path))
+
+        if image is None:
+            return variants, temporary_files
+
+        height, width = image.shape[:2]
+        scale = 2.0 if max(height, width) < 1600 else 1.5
+
+        upscaled = cv2.resize(
+            image,
+            None,
+            fx=scale,
+            fy=scale,
+            interpolation=cv2.INTER_CUBIC
         )
 
-        if texts:
-            ocr_texts.extend(texts)
+        gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+        enhanced = cv2.equalizeHist(gray)
 
-    return ocr_texts
+        for prefix, variant in (
+            ("ocr_upscaled_", upscaled),
+            ("ocr_enhanced_", enhanced),
+        ):
+            temp_file = tempfile.NamedTemporaryFile(
+                prefix=prefix,
+                suffix=".png",
+                delete=False
+            )
+            temp_path = temp_file.name
+            temp_file.close()
 
+            if cv2.imwrite(temp_path, variant):
+                variants.append(temp_path)
+                temporary_files.append(temp_path)
+            else:
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+    except Exception:
+        # Always retain the original image as a fallback.
+        pass
+
+    return variants, temporary_files
+
+
+def run_ocr_on_image(image_path):
+    """
+    Run OCR on the original image plus a small number of preprocessing
+    variants and combine unique recognized text.
+    """
+    variants, temporary_files = _prepare_ocr_variants(image_path)
+
+    all_texts = []
+    seen = set()
+
+    try:
+        for variant in variants:
+            try:
+                texts = _collect_ocr_texts(variant)
+            except Exception:
+                continue
+
+            for value in texts:
+                key = normalize_text(value)
+                if key and key not in seen:
+                    seen.add(key)
+                    all_texts.append(value)
+
+    finally:
+        for temp_path in temporary_files:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    return all_texts
 
 # ============================================================
 # DOCUMENT PHOTO EXTRACTION

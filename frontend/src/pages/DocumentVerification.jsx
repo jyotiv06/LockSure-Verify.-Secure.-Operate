@@ -13,6 +13,7 @@ function DocumentVerification() {
 
   const [customer, setCustomer] = useState(null);
   const [verificationId, setVerificationId] = useState(null);
+  const [documentScore, setDocumentScore] = useState(null);
 
   const [document, setDocument] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -149,6 +150,7 @@ function DocumentVerification() {
     }
 
     setDocument(file);
+    setDocumentScore(null);
     setError("");
     setStatus("idle");
 
@@ -199,17 +201,24 @@ function DocumentVerification() {
       setError("");
       setStatus("processing");
 
+      /*
+       * IMPORTANT:
+       * Do NOT send document_match=true.
+       *
+       * The actual file is uploaded to FastAPI. The backend stores it
+       * temporarily and sends it through Samiksha's OCR integration.
+       */
+      const formData = new FormData();
+      formData.append("file", document);
+
       const response = await fetch(
-        `${API_BASE_URL}/verification/${activeVerificationId}/document`,
+        `${API_BASE_URL}/verification/${activeVerificationId}/document/upload`,
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            document_match: true,
-          }),
+          body: formData,
         }
       );
 
@@ -242,6 +251,23 @@ function DocumentVerification() {
         String(activeVerificationId)
       );
 
+      const verified =
+        data.document_match === true ||
+        data.state === "DOCUMENT_VERIFIED";
+
+      const score =
+        typeof data.document_score === "number"
+          ? data.document_score
+          : null;
+
+      setDocumentScore(score);
+
+      if (!verified) {
+        throw new Error(
+          "Document could not be verified by the OCR system."
+        );
+      }
+
       setStatus("verified");
 
     } catch (err) {
@@ -265,6 +291,7 @@ function DocumentVerification() {
 
   const handleRemove = () => {
     setDocument(null);
+    setDocumentScore(null);
     setPreview(null);
     setStatus("idle");
     setError("");
@@ -515,8 +542,14 @@ function DocumentVerification() {
                   </h3>
 
                   <p className="mt-1 text-sm text-green-700">
-                    Your document has been successfully verified.
+                    Your document has been successfully verified by the
+                    document verification system.
                   </p>
+                  {documentScore !== null && (
+                    <p className="mt-2 text-sm font-semibold text-green-800">
+                      Match score: {documentScore.toFixed(1)}%
+                    </p>
+                  )}
                 </div>
 
               </div>
