@@ -7,29 +7,39 @@ OUTPUT_PATH = "data/live/captured.jpg"
 
 def capture_face(output_path=OUTPUT_PATH):
 
-    # Open default webcam
     camera = cv2.VideoCapture(0)
 
     if not camera.isOpened():
+
         print("ERROR: Could not open camera.")
+
         return False
 
-    # Load Haar Cascade for basic face detection
-    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    cascade_path = (
+        cv2.data.haarcascades
+        + "haarcascade_frontalface_default.xml"
+    )
 
-    face_detector = cv2.CascadeClassifier(cascade_path)
+    face_detector = cv2.CascadeClassifier(
+        cascade_path
+    )
 
     if face_detector.empty():
-        print("ERROR: Could not load face detector.")
+
+        print(
+            "ERROR: Could not load face detector."
+        )
+
         camera.release()
+
         return False
 
     print()
     print("=" * 60)
-    print("FACE CAPTURE")
+    print("LOCKSURE - LIVE FACE CAPTURE")
     print("=" * 60)
     print("Look directly at the camera.")
-    print("Make sure only ONE person is visible.")
+    print("Only ONE person should be visible.")
     print("Press SPACE to capture.")
     print("Press ESC to cancel.")
     print("=" * 60)
@@ -41,13 +51,18 @@ def capture_face(output_path=OUTPUT_PATH):
         ret, frame = camera.read()
 
         if not ret:
-            print("ERROR: Could not read camera frame.")
+
+            print(
+                "ERROR: Could not read camera frame."
+            )
+
             break
 
-        # Convert to grayscale
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2GRAY
+        )
 
-        # Detect faces
         faces = face_detector.detectMultiScale(
             gray,
             scaleFactor=1.1,
@@ -57,7 +72,6 @@ def capture_face(output_path=OUTPUT_PATH):
 
         face_count = len(faces)
 
-        # Draw boxes
         for (x, y, w, h) in faces:
 
             cv2.rectangle(
@@ -68,25 +82,30 @@ def capture_face(output_path=OUTPUT_PATH):
                 2
             )
 
-        # Status text
         if face_count == 0:
 
-            status = "NO FACE - Move into camera"
+            status = (
+                "NO FACE - Move into camera"
+            )
 
         elif face_count == 1:
 
-            status = "FACE DETECTED - Press SPACE"
+            status = (
+                "FACE DETECTED - Press SPACE"
+            )
 
         else:
 
-            status = "MULTIPLE FACES - Only one person allowed"
+            status = (
+                "MULTIPLE FACES - Only one allowed"
+            )
 
         cv2.putText(
             frame,
             status,
             (20, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
+            0.7,
             (0, 255, 0),
             2
         )
@@ -101,39 +120,58 @@ def capture_face(output_path=OUTPUT_PATH):
             2
         )
 
-        cv2.imshow("LockSure - Face Capture", frame)
+        cv2.imshow(
+            "LockSure - Live Face Capture",
+            frame
+        )
 
         key = cv2.waitKey(1) & 0xFF
 
+        # ----------------------------------------------------
         # ESC
+        # ----------------------------------------------------
+
         if key == 27:
 
-            print("Capture cancelled.")
+            print(
+                "Capture cancelled."
+            )
+
             break
 
+        # ----------------------------------------------------
         # SPACE
+        # ----------------------------------------------------
+
         if key == 32:
 
             if face_count == 0:
 
-                print("Cannot capture: No face detected.")
+                print(
+                    "Cannot capture: No face detected."
+                )
+
                 continue
 
             if face_count > 1:
 
                 print(
-                    "Cannot capture: Multiple faces detected. "
-                    "Only one person is allowed."
+                    "Cannot capture: Multiple faces detected."
                 )
+
                 continue
 
-            # Create directory if needed
-            directory = os.path.dirname(output_path)
+            directory = os.path.dirname(
+                output_path
+            )
 
             if directory:
-                os.makedirs(directory, exist_ok=True)
 
-            # Save image
+                os.makedirs(
+                    directory,
+                    exist_ok=True
+                )
+
             success = cv2.imwrite(
                 output_path,
                 frame
@@ -142,18 +180,26 @@ def capture_face(output_path=OUTPUT_PATH):
             if success:
 
                 print()
-                print("Face captured successfully!")
-                print(f"Saved to: {output_path}")
+                print(
+                    "Face captured successfully."
+                )
+
+                print(
+                    f"Saved to: {output_path}"
+                )
 
                 captured = True
 
             else:
 
-                print("ERROR: Could not save captured image.")
+                print(
+                    "ERROR: Could not save image."
+                )
 
             break
 
     camera.release()
+
     cv2.destroyAllWindows()
 
     return captured

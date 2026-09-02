@@ -2,10 +2,16 @@ deepface
 opencv-python
 numpy
 pandas
-Pillow
 tensorflow
 tf-keras
+Pillow
+
 fastapi
 uvicorn
 python-multipart
 requests
+
+paddleocr
+paddlepaddle
+
+pdf2image
