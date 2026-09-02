@@ -1,9 +1,5 @@
-from datetime import datetime
-
-
-# Temporary in-memory audit storage.
-# Database integration will be added later.
-audit_logs = []
+from database import SessionLocal
+from models.audit_log import AuditLog
 
 
 def create_audit_log(
@@ -12,33 +8,94 @@ def create_audit_log(
     action: str,
     details: str = ""
 ):
+    db = SessionLocal()
 
-    log = {
-        "customer_id": customer_id,
-        "locker_id": locker_id,
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now().isoformat()
-    }
+    try:
+        audit = AuditLog(
+            action=action,
+            entity_type="CUSTOMER_LOCKER",
+            entity_id=customer_id,
+            details={
+                "customer_id": customer_id,
+                "locker_id": locker_id,
+                "details": details
+            }
+        )
 
-    audit_logs.append(log)
+        db.add(audit)
+        db.commit()
+        db.refresh(audit)
 
-    return log
+        return {
+            "customer_id": customer_id,
+            "locker_id": locker_id,
+            "action": audit.action,
+            "details": details,
+            "timestamp": audit.created_at.isoformat()
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
 
 
 def get_customer_logs(customer_id: int):
+    db = SessionLocal()
 
-    return [
-        log
-        for log in audit_logs
-        if log["customer_id"] == customer_id
-    ]
+    try:
+        logs = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == "CUSTOMER_LOCKER",
+                AuditLog.entity_id == customer_id
+            )
+            .order_by(AuditLog.created_at.desc())
+            .all()
+        )
+
+        return [
+            {
+                "customer_id": log.details.get("customer_id"),
+                "locker_id": log.details.get("locker_id"),
+                "action": log.action,
+                "details": log.details.get("details", ""),
+                "timestamp": log.created_at.isoformat()
+            }
+            for log in logs
+        ]
+
+    finally:
+        db.close()
 
 
 def get_locker_logs(locker_id: int):
+    db = SessionLocal()
 
-    return [
-        log
-        for log in audit_logs
-        if log["locker_id"] == locker_id
-    ]
+    try:
+        logs = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.entity_type == "CUSTOMER_LOCKER"
+            )
+            .order_by(AuditLog.created_at.desc())
+            .all()
+        )
+
+        return [
+            {
+                "customer_id": log.details.get("customer_id"),
+                "locker_id": log.details.get("locker_id"),
+                "action": log.action,
+                "details": log.details.get("details", ""),
+                "timestamp": log.created_at.isoformat()
+            }
+            for log in logs
+            if log.details
+            and log.details.get("locker_id") == locker_id
+        ]
+
+    finally:
+        db.close()

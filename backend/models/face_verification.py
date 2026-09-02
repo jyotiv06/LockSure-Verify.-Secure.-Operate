@@ -1,4 +1,11 @@
-from sqlalchemy import Column, BigInteger, String, Numeric, DateTime, ForeignKey
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    Numeric,
+    DateTime,
+    ForeignKey
+)
 from sqlalchemy.sql import func
 
 from database import Base
@@ -19,14 +26,19 @@ class FaceVerification(Base):
         nullable=False
     )
 
-    customer_id = Column(
-        BigInteger,
-        ForeignKey("customers.customer_id"),
-        nullable=False
+    reference_id = Column(
+        String(255),
+        nullable=True
     )
 
-    match_score = Column(
-        Numeric(5, 2)
+    similarity_score = Column(
+        Numeric(5, 4),
+        nullable=True
+    )
+
+    liveness_score = Column(
+        Numeric(5, 4),
+        nullable=True
     )
 
     result = Column(
@@ -36,5 +48,6 @@ class FaceVerification(Base):
 
     verified_at = Column(
         DateTime,
-        server_default=func.now()
+        server_default=func.now(),
+        nullable=False
     )

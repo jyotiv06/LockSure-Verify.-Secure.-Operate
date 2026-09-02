@@ -7,7 +7,11 @@ from database import Base
 class Locker(Base):
     __tablename__ = "lockers"
 
-    locker_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    locker_id = Column(
+        BigInteger,
+        primary_key=True,
+        autoincrement=True
+    )
 
     locker_number = Column(
         String(20),
@@ -15,8 +19,8 @@ class Locker(Base):
         nullable=False
     )
 
-    branch_name = Column(
-        String(100),
+    branch_code = Column(
+        String(20),
         nullable=False
     )
 
@@ -31,13 +35,11 @@ class Locker(Base):
         default="AVAILABLE"
     )
 
-    customer_id = Column(
+    assigned_customer_id = Column(
         BigInteger,
         ForeignKey("customers.customer_id"),
         nullable=True
     )
-
-    assigned_at = Column(DateTime)
 
     created_at = Column(
         DateTime,

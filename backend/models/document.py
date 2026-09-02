@@ -1,4 +1,11 @@
-from sqlalchemy import Column, BigInteger, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey
+)
 from sqlalchemy.sql import func
 
 from database import Base
@@ -30,7 +37,8 @@ class Document(Base):
     )
 
     document_reference = Column(
-        String(255)
+        String(255),
+        nullable=True
     )
 
     verified = Column(

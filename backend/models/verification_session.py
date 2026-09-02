@@ -25,12 +25,22 @@ class VerificationSession(Base):
         nullable=True
     )
 
-    started_at = Column(
-        DateTime,
-        server_default=func.now()
+    officer_id = Column(
+        BigInteger,
+        ForeignKey("users.user_id"),
+        nullable=True
     )
 
-    completed_at = Column(DateTime)
+    started_at = Column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False
+    )
+
+    completed_at = Column(
+        DateTime,
+        nullable=True
+    )
 
     status = Column(
         String(20),

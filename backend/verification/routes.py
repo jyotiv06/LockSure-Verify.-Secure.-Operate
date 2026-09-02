@@ -6,7 +6,7 @@ from .service import (
     get_verification,
     process_document,
     process_face,
-    finalize_verification,
+    finalize_verification
 )
 
 
@@ -22,6 +22,7 @@ class VerificationStartRequest(BaseModel):
 
 
 class DocumentResultRequest(BaseModel):
+    document_id: int
     document_match: bool
 
 
@@ -31,15 +32,22 @@ class FaceResultRequest(BaseModel):
 
 @router.post("/start")
 def start(request: VerificationStartRequest):
-    return start_verification(
+    session = start_verification(
         request.customer_id,
         request.locker_id
     )
 
+    if not session:
+        raise HTTPException(
+            status_code=404,
+            detail="Customer not found or locker is unavailable"
+        )
+
+    return session
+
 
 @router.get("/{verification_id}")
-def get_session(verification_id: str):
-
+def get_session(verification_id: int):
     session = get_verification(verification_id)
 
     if not session:
@@ -53,19 +61,19 @@ def get_session(verification_id: str):
 
 @router.post("/{verification_id}/document")
 def document_result(
-    verification_id: str,
+    verification_id: int,
     request: DocumentResultRequest
 ):
-
     session = process_document(
         verification_id,
+        request.document_id,
         request.document_match
     )
 
     if not session:
         raise HTTPException(
             status_code=404,
-            detail="Verification not found"
+            detail="Verification or document not found"
         )
 
     return session
@@ -73,10 +81,9 @@ def document_result(
 
 @router.post("/{verification_id}/face")
 def face_result(
-    verification_id: str,
+    verification_id: int,
     request: FaceResultRequest
 ):
-
     session = process_face(
         verification_id,
         request.face_match
@@ -92,11 +99,8 @@ def face_result(
 
 
 @router.post("/{verification_id}/finalize")
-def finalize(verification_id: str):
-
-    session = finalize_verification(
-        verification_id
-    )
+def finalize(verification_id: int):
+    session = finalize_verification(verification_id)
 
     if not session:
         raise HTTPException(

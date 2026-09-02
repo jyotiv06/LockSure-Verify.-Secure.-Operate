@@ -1,4 +1,12 @@
-from sqlalchemy import Column, BigInteger, String, Numeric, Text, DateTime, ForeignKey
+from sqlalchemy import (
+    Column,
+    BigInteger,
+    String,
+    Numeric,
+    Text,
+    DateTime,
+    ForeignKey
+)
 from sqlalchemy.sql import func
 
 from database import Base
@@ -7,7 +15,7 @@ from database import Base
 class RiskAssessment(Base):
     __tablename__ = "risk_assessments"
 
-    risk_id = Column(
+    risk_assessment_id = Column(
         BigInteger,
         primary_key=True,
         autoincrement=True
@@ -20,7 +28,8 @@ class RiskAssessment(Base):
     )
 
     risk_score = Column(
-        Numeric(5, 2)
+        Numeric(5, 2),
+        nullable=False
     )
 
     risk_level = Column(
@@ -28,9 +37,18 @@ class RiskAssessment(Base):
         nullable=False
     )
 
-    reason = Column(Text)
+    decision = Column(
+        String(30),
+        nullable=False
+    )
 
-    created_at = Column(
+    reason = Column(
+        Text,
+        nullable=True
+    )
+
+    assessed_at = Column(
         DateTime,
-        server_default=func.now()
+        server_default=func.now(),
+        nullable=False
     )
