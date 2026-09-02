@@ -932,3 +932,5 @@ def finalize_verification(verification_id: str):
             "suspicious_activity": suspicious,
             "suspicious_severity": suspicious_severity,
         }
+    finally:
+        db.close()

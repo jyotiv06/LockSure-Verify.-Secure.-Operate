@@ -7,7 +7,6 @@ import {
   ScanFace,
   CircleCheck,
   CircleX,
-  XCircle,
 } from "lucide-react";
 
 import {
@@ -35,14 +34,16 @@ function CustomerVerification() {
 
   const navigate = useNavigate();
 
-  const [searchParams] = useSearchParams();
+  const [searchParams] =
+    useSearchParams();
 
 
   /*
     Prevent duplicate verification
     creation in React Strict Mode
   */
-  const initializedCustomerRef = useRef(null);
+  const initializedCustomerRef =
+    useRef(null);
 
 
   /*
@@ -71,7 +72,7 @@ function CustomerVerification() {
 
 
   /*
-    Real customer data
+    Customer data
   */
   const [
     customerData,
@@ -89,7 +90,7 @@ function CustomerVerification() {
 
 
   /*
-    Action loading state
+    Action loading
   */
   const [
     actionLoading,
@@ -107,54 +108,53 @@ function CustomerVerification() {
 
 
   /*
-    Officer decision
+    =================================
+    FETCH VERIFICATION SESSION
+    =================================
   */
-  const [
-    decision,
-    setDecision,
-  ] = useState("");
+  const fetchVerification =
+    async (id) => {
+
+      try {
+
+        const response =
+          await api.get(
+            `/verification/${id}`
+          );
 
 
-  /*
-    Fetch verification session
-  */
-  const fetchVerification = async (id) => {
-
-    try {
-
-      const response =
-        await api.get(
-          `/verification/${id}`
+        setVerificationData(
+          response.data
         );
 
-      setVerificationData(
-        response.data
-      );
 
-      console.log(
-        "Verification data:",
-        response.data
-      );
+        console.log(
+          "Verification data:",
+          response.data
+        );
 
-      return response.data;
 
-    } catch (error) {
+        return response.data;
 
-      console.error(
-        "Failed to fetch verification:",
-        error
-      );
+      } catch (error) {
 
-      setApiError(
-        error.response?.data?.detail ||
-        "Failed to fetch verification details"
-      );
+        console.error(
+          "Failed to fetch verification:",
+          error
+        );
 
-      return null;
 
-    }
+        setApiError(
+          error.response?.data?.detail ||
+          "Failed to fetch verification details."
+        );
 
-  };
+
+        return null;
+
+      }
+
+    };
 
 
   /*
@@ -176,18 +176,21 @@ function CustomerVerification() {
           setLoading(false);
 
           return;
+
         }
 
 
         /*
-          Prevent duplicate calls
-          in React Strict Mode
+          Prevent duplicate POST requests
+          caused by React Strict Mode
         */
         if (
           initializedCustomerRef.current ===
           customerIdentifier
         ) {
+
           return;
+
         }
 
 
@@ -203,8 +206,10 @@ function CustomerVerification() {
 
 
           /*
+            =================================
             STEP 1:
             FETCH CUSTOMER
+            =================================
           */
           const customerResponse =
             await api.get(
@@ -229,40 +234,145 @@ function CustomerVerification() {
           );
 
 
-          if (!customer.customer_id) {
+          /*
+            =================================
+            STEP 2:
+            PREPARE BACKEND VALUES
+            =================================
+
+            IMPORTANT:
+
+            customer.customer_id
+            -> Database customer ID
+
+            customer.locker_number
+            -> Business locker number
+
+            Backend start_verification()
+            searches by:
+
+            Locker.locker_number == locker_id
+          */
+
+          const verificationCustomerId =
+            customer.customer_id;
+
+
+          const verificationLockerNumber =
+            customer.locker_number;
+
+
+          console.log(
+            "Verification values being sent:",
+            {
+              customer_id:
+                verificationCustomerId,
+
+              customer_id_type:
+                typeof verificationCustomerId,
+
+              locker_number:
+                verificationLockerNumber,
+
+              locker_number_type:
+                typeof verificationLockerNumber,
+            }
+          );
+
+
+          /*
+            VALIDATE CUSTOMER ID
+          */
+          if (
+            verificationCustomerId === null ||
+            verificationCustomerId === undefined
+          ) {
 
             throw new Error(
-              "Customer ID was not returned by the server."
+              "Backend customer ID was not found."
             );
 
-          }
-
-
-          if (!customer.locker_id) {
-
-            setApiError(
-              `${customer.full_name || "This customer"} does not have an assigned locker.`
-            );
-
-            return;
           }
 
 
           /*
-            STEP 2:
+            VALIDATE LOCKER NUMBER
+          */
+          if (
+            !verificationLockerNumber
+          ) {
+
+            throw new Error(
+              "Customer does not have a valid locker number."
+            );
+
+          }
+
+
+          /*
+            =================================
+            STEP 3:
             START VERIFICATION
+            =================================
           */
           const response =
             await api.post(
               "/verification/start",
               {
-
+                /*
+                  Integer database ID
+                */
                 customer_id:
-                  customer.customer_id,
+                  Number(
+                    verificationCustomerId
+                  ),
 
+                /*
+                  Backend expects business
+                  locker number such as:
+                  L001
+                  L032
+                */
                 locker_id:
-                  customer.locker_id,
+                  String(
+                    verificationLockerNumber
+                  ),
 
+                account_status:
+                  customer.account_status ||
+                  "ACTIVE",
+
+                failed_attempts:
+                  0,
+
+                access_attempts_last_hour:
+                  0,
+
+                customer_data: {
+                  customer_id:
+                    customer.customer_id,
+
+                  customer_number:
+                    customer.customer_number,
+
+                  full_name:
+                    customer.full_name,
+
+                  email:
+                    customer.email,
+
+                  phone:
+                    customer.phone,
+
+                  account_number:
+                    customer.account_number,
+
+                  locker_number:
+                    customer.locker_number,
+
+                  branch_name:
+                    customer.branch_name,
+                },
               }
             );
 
@@ -273,9 +383,17 @@ function CustomerVerification() {
           );
 
 
+          /*
+            Backend returns:
+
+            verification_id
+
+            Keep fallback support for
+            other possible response formats.
+          */
           const id =
-            response.data.session_id ||
             response.data.verification_id ||
+            response.data.session_id ||
             response.data.id;
 
 
@@ -297,6 +415,9 @@ function CustomerVerification() {
           );
 
 
+          /*
+            SAVE SESSION DATA
+          */
           localStorage.setItem(
             "verificationId",
             sessionId
@@ -306,22 +427,41 @@ function CustomerVerification() {
           localStorage.setItem(
             "verificationCustomerId",
             String(
-              customer.customer_id
-            )
-          );
-
-
-          localStorage.setItem(
-            "verificationLockerId",
-            String(
-              customer.locker_id
+              verificationCustomerId
             )
           );
 
 
           /*
-            STEP 3:
-            FETCH VERIFICATION
+            Save business locker number,
+            not database locker ID
+          */
+          localStorage.setItem(
+            "verificationLockerId",
+            String(
+              verificationLockerNumber
+            )
+          );
+
+
+          /*
+            Initially use POST response
+            immediately.
+
+            This prevents the UI from
+            becoming empty if GET response
+            structure differs.
+          */
+          setVerificationData(
+            response.data
+          );
+
+
+          /*
+            =================================
+            STEP 4:
+            FETCH COMPLETE SESSION
+            =================================
           */
           await fetchVerification(
             sessionId
@@ -372,6 +512,9 @@ function CustomerVerification() {
           }
 
 
+          /*
+            Allow retry after failure
+          */
           initializedCustomerRef.current =
             null;
 
@@ -388,7 +531,9 @@ function CustomerVerification() {
     initializeVerification();
 
 
-  }, [customerIdentifier]);
+  }, [
+    customerIdentifier
+  ]);
 
 
   /*
@@ -400,7 +545,13 @@ function CustomerVerification() {
     async (documentMatch) => {
 
       if (!verificationId) {
+
+        setApiError(
+          "Verification session is not available."
+        );
+
         return;
+
       }
 
 
@@ -463,7 +614,13 @@ function CustomerVerification() {
     async (faceMatch) => {
 
       if (!verificationId) {
+
+        setApiError(
+          "Verification session is not available."
+        );
+
         return;
+
       }
 
 
@@ -526,7 +683,13 @@ function CustomerVerification() {
     async () => {
 
       if (!verificationId) {
+
+        setApiError(
+          "Verification session is not available."
+        );
+
         return;
+
       }
 
 
@@ -554,15 +717,19 @@ function CustomerVerification() {
         );
 
 
-        setDecision(
-          response.data.state
-        );
-
-
         localStorage.setItem(
           "verificationDecision",
           response.data.state
         );
+
+
+        /*
+          Fetch latest complete data
+        */
+        await fetchVerification(
+          verificationId
+        );
+
 
       } catch (error) {
 
@@ -589,6 +756,99 @@ function CustomerVerification() {
 
   /*
     =================================
+    MERGE CUSTOMER + VERIFICATION DATA
+    =================================
+  */
+  const displayData = {
+
+    ...(verificationData || {}),
+
+
+    customer_id:
+      customerData?.customer_id ??
+      verificationData?.customer_id ??
+      null,
+
+
+    customer_number:
+      customerData?.customer_number ??
+      verificationData?.customer_number ??
+      null,
+
+
+    full_name:
+      customerData?.full_name ??
+      verificationData?.full_name ??
+      verificationData?.customer_name ??
+      null,
+
+
+    customer_name:
+      customerData?.full_name ??
+      verificationData?.customer_name ??
+      verificationData?.full_name ??
+      null,
+
+
+    email:
+      customerData?.email ??
+      verificationData?.email ??
+      null,
+
+
+    phone:
+      customerData?.phone ??
+      verificationData?.phone ??
+      null,
+
+
+    account_id:
+      customerData?.account_id ??
+      verificationData?.account_id ??
+      null,
+
+
+    account_number:
+      customerData?.account_number ??
+      verificationData?.account_number ??
+      null,
+
+
+    locker_id:
+      customerData?.locker_id ??
+      verificationData?.locker_id ??
+      null,
+
+
+    locker_number:
+      customerData?.locker_number ??
+      verificationData?.locker_number ??
+      null,
+
+
+    locker_status:
+      customerData?.locker_status ??
+      verificationData?.locker_status ??
+      null,
+
+
+    branch_name:
+      customerData?.branch_name ??
+      verificationData?.branch_name ??
+      null,
+
+
+    locker_location:
+      customerData?.locker_location ??
+      verificationData?.locker_location ??
+      customerData?.location ??
+      verificationData?.location ??
+      null,
+  };
+
+
+  /*
+    =================================
     OPEN LOCKER
     =================================
   */
@@ -604,114 +864,26 @@ function CustomerVerification() {
       );
 
       return;
+
     }
+
 
     navigate(
       `/officer/lockers?verification=${verificationId}&status=approved`,
       {
         state: {
-          customer: displayData,
+          customer:
+            displayData,
+
+          verificationId:
+            verificationId,
         },
       }
     );
 
   };
-  /*
-    =================================
-    MERGE CUSTOMER + VERIFICATION DATA
-    =================================
-  */
-  const displayData = {
-
-    ...(verificationData || {}),
 
 
-    customer_id:
-      customerData?.customer_id ||
-      verificationData?.customer_id ||
-      null,
-
-
-    customer_number:
-      customerData?.customer_number ||
-      verificationData?.customer_number ||
-      null,
-
-
-    full_name:
-      customerData?.full_name ||
-      verificationData?.full_name ||
-      verificationData?.customer_name ||
-      null,
-
-
-    customer_name:
-      customerData?.full_name ||
-      verificationData?.customer_name ||
-      verificationData?.full_name ||
-      null,
-
-
-    email:
-      customerData?.email ||
-      verificationData?.email ||
-      null,
-
-
-    phone:
-      customerData?.phone ||
-      verificationData?.phone ||
-      null,
-
-
-    account_id:
-      customerData?.account_id ||
-      verificationData?.account_id ||
-      null,
-
-
-    account_number:
-      customerData?.account_number ||
-      verificationData?.account_number ||
-      null,
-
-
-    locker_id:
-      customerData?.locker_id ||
-      verificationData?.locker_id ||
-      null,
-
-
-    locker_number:
-      customerData?.locker_number ||
-      verificationData?.locker_number ||
-      null,
-
-
-    locker_status:
-      customerData?.locker_status ||
-      verificationData?.locker_status ||
-      null,
-
-
-    branch_name:
-      customerData?.branch_name ||
-      verificationData?.branch_name ||
-      null,
-
-
-    locker_location:
-      customerData?.locker_location ||
-      verificationData?.locker_location ||
-      customerData?.location ||
-      verificationData?.location ||
-      null,
-  };
-
-  console.log(
-    "DISPLAY DATA RISK SCORE:",
-    displayData?.risk_score
-  );
   /*
     =================================
     STATUS
@@ -728,7 +900,9 @@ function CustomerVerification() {
     ) {
 
       return {
-        label: "Approved",
+        label:
+          "Approved",
+
         className:
           "border-green-200 bg-green-50 text-green-700",
       };
@@ -741,7 +915,9 @@ function CustomerVerification() {
     ) {
 
       return {
-        label: "Blocked",
+        label:
+          "Blocked",
+
         className:
           "border-red-200 bg-red-50 text-red-700",
       };
@@ -754,7 +930,9 @@ function CustomerVerification() {
     ) {
 
       return {
-        label: "Manual Review",
+        label:
+          "Manual Review",
+
         className:
           "border-amber-200 bg-amber-50 text-amber-700",
       };
@@ -780,7 +958,7 @@ function CustomerVerification() {
 
   /*
     =================================
-    VERIFICATION STATUS VALUES
+    VERIFICATION STATUS
     =================================
   */
   const documentStatus =
@@ -900,7 +1078,6 @@ function CustomerVerification() {
 
               <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
 
-
                 <div>
 
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#2563EB]">
@@ -1019,10 +1196,10 @@ function CustomerVerification() {
 
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${documentStatus === "Verified"
-                        ? "bg-green-50 text-green-700"
-                        : documentStatus === "Failed"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-amber-50 text-amber-700"
+                          ? "bg-green-50 text-green-700"
+                          : documentStatus === "Failed"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-amber-50 text-amber-700"
                         }`}
                     >
                       {documentStatus}
@@ -1099,10 +1276,10 @@ function CustomerVerification() {
 
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${faceStatus === "Verified"
-                        ? "bg-green-50 text-green-700"
-                        : faceStatus === "Failed"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-amber-50 text-amber-700"
+                          ? "bg-green-50 text-green-700"
+                          : faceStatus === "Failed"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-amber-50 text-amber-700"
                         }`}
                     >
                       {faceStatus}
@@ -1120,12 +1297,19 @@ function CustomerVerification() {
                   </p>
 
                   <p className="mt-3 text-sm font-semibold text-[#111827]">
+
                     Match Score:{" "}
+
                     <span className="text-[#2563EB]">
+
                       {displayData?.face_match_score != null
-                        ? `${Number(displayData.face_match_score).toFixed(1)}%`
+                        ? `${Number(
+                          displayData.face_match_score
+                        ).toFixed(1)}%`
                         : "Pending"}
+
                     </span>
+
                   </p>
 
 
@@ -1173,7 +1357,6 @@ function CustomerVerification() {
                   )}
 
                 </div>
-
 
               </div>
 
@@ -1298,9 +1481,11 @@ function CustomerVerification() {
 
                     <span
                       className={
-                        verificationData?.state === "APPROVED"
+                        verificationData?.state ===
+                          "APPROVED"
                           ? "text-green-600"
-                          : verificationData?.state === "BLOCKED"
+                          : verificationData?.state ===
+                            "BLOCKED"
                             ? "text-red-600"
                             : "text-amber-600"
                       }
@@ -1349,11 +1534,9 @@ function CustomerVerification() {
 
             </div>
 
-
           </>
 
         )}
-
 
     </OfficerLayout>
 

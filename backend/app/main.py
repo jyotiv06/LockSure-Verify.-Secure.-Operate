@@ -5,6 +5,7 @@ from .auth.router import router as auth_router
 from .customers.router import router as customer_router
 from .accounts.router import router as account_router
 
+from locker.routes import router as locker_router
 from verification.routes import router as verification_router
 from audit.routes import router as audit_router
 
@@ -55,7 +56,7 @@ app.include_router(verification_router)
 
 # Audit APIs
 app.include_router(audit_router)
-
+app.include_router(locker_router)
 
 @app.get("/")
 def root():

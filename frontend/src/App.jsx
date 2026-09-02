@@ -1,9 +1,4 @@
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Home / Portal Selection
 import PortalSelection from "./pages/PortalSelection";
@@ -27,13 +22,9 @@ import LockerOperation from "./pages/officer/LockerOperation";
 import SecurityAlerts from "./pages/officer/SecurityAlerts";
 import AuditHistory from "./pages/officer/AuditHistory";
 
-
 function App() {
-
   return (
-
     <BrowserRouter>
-
       <Routes>
 
         {/* ========================= */}
@@ -45,7 +36,6 @@ function App() {
           element={<PortalSelection />}
         />
 
-
         {/* ========================= */}
         {/* CUSTOMER AUTHENTICATION */}
         {/* ========================= */}
@@ -56,15 +46,15 @@ function App() {
         />
 
         <Route
-          path="/customer/login"
-          element={<Login />}
-        />
-
-        <Route
           path="/register"
           element={<Register />}
         />
 
+        {/* Optional customer login route */}
+        <Route
+          path="/customer/login"
+          element={<Login />}
+        />
 
         {/* ========================= */}
         {/* CUSTOMER PORTAL */}
@@ -80,9 +70,8 @@ function App() {
           element={<Profile />}
         />
 
-
         {/* ========================= */}
-        {/* CUSTOMER VERIFICATION FLOW */}
+        {/* CUSTOMER VERIFICATION */}
         {/* ========================= */}
 
         <Route
@@ -104,7 +93,6 @@ function App() {
           path="/locker-status"
           element={<LockerStatus />}
         />
-
 
         {/* ========================= */}
         {/* OFFICER PORTAL */}
@@ -155,7 +143,6 @@ function App() {
           element={<AuditHistory />}
         />
 
-
         {/* ========================= */}
         {/* UNKNOWN ROUTES */}
         {/* ========================= */}
@@ -171,12 +158,8 @@ function App() {
         />
 
       </Routes>
-
     </BrowserRouter>
-
   );
-
 }
-
 
 export default App;
